@@ -341,6 +341,12 @@ bool Lifter::InstructionLifter::Run() {
         const auto ops = GetOps(2);
         p.StoreRegister(rinst, ops[0], rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[1]), rinst.builder->getInt64Ty(), true));
     } break;
+    case AArch64_INS_ALIAS_CMP: {
+        const auto ops = GetOps(2);
+        p.comparison.first = p.GetRegisterView(rinst, ops[0]);
+        p.comparison.second = p.GetRegisterView(rinst, ops[1]);
+        p.dirty_comparison = true;
+    }; break;
     // Load and store instructions
     case AArch64_INS_ALIAS_LDUR:
     case AArch64_INS_LDUR: extra_flags[0] = true; [[fallthrough]];

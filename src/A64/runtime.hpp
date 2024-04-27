@@ -54,6 +54,7 @@ struct Runtime::Impl {
         SP = 0;
     std::array<uint64_t, 31> registers{};
     std::array<Vector, 32> vectors{};
+    std::pair<uint64_t, uint64_t> comparison{};
 
     Lifter raiser;
     UserConfig conf;

@@ -58,8 +58,8 @@ class Lifter {
     std::array<bool, 32> dirty_vectors;
     llvm::Value *stack_pointer;
     bool dirty_stack_pointer{};
-
     std::pair<llvm::Value *, llvm::Value *> comparison;
+    bool dirty_comparison{};
 
     void ResetScratchRegisters();
     RegisterDescription AllocateScratchRegister(bool as_word);
@@ -76,6 +76,9 @@ class Lifter {
     void CreateRegisterRestore(Instance&);
     void CreateRegisterSave(Instance&);
     void CreatePCSave(Instance&);
+
+    static llvm::Value *CreateLoadFromPtr(Instance& rinst, void *, llvm::Type *type, const llvm::Twine& name = "");
+    static void CreateStoreToPtr(Instance& rinst, void *, llvm::Value *value);
 
     llvm::Value *CreateMemoryLoad(Instance&, llvm::Value *address, llvm::Type *);
     void CreateMemoryStore(Instance&, llvm::Value *address, llvm::Value *data);

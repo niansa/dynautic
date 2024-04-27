@@ -16,30 +16,36 @@ using namespace llvm::orc;
 namespace Dynautic::A64 {
 void Lifter::CreateRegisterRestore(Instance& rinst) {
     // Fill in stack pointer
-    Value *ptr = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<uint64_t>(&rt.SP)), rinst.builder->getPtrTy());
-    stack_pointer = rinst.builder->CreateLoad(rinst.builder->getInt64Ty(), ptr, "sp_");
+    stack_pointer = CreateLoadFromPtr(rinst, &rt.SP, rinst.builder->getInt64Ty(), "sp_");
     dirty_stack_pointer = false;
 
     // Fill in general purpose registers
     for (unsigned idx = 0; idx != registers.size(); ++idx) {
-        Value *ptr = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<uint64_t>(&rt.registers[idx])), rinst.builder->getPtrTy());
-        registers[idx] = rinst.builder->CreateLoad(rinst.builder->getInt64Ty(), ptr, "r"+std::to_string(idx)+'_');
+        registers[idx] = CreateLoadFromPtr(rinst, &rt.registers[idx], rinst.builder->getInt64Ty(), "r"+std::to_string(idx)+'_');
     }
     dirty_registers.fill(false);
 
     // Fill in vector registers
     for (unsigned idx = 0; idx != vectors.size(); ++idx) {
-        Value *ptr = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<uint64_t>(&rt.vectors[idx])), rinst.builder->getPtrTy());
-        vectors[idx] = rinst.builder->CreateLoad(rinst.builder->getInt128Ty(), ptr, "d"+std::to_string(idx)+'_');
+        vectors[idx] = CreateLoadFromPtr(rinst, &rt.vectors[idx], rinst.builder->getInt128Ty(), "d"+std::to_string(idx)+'_');
     }
     dirty_vectors.fill(false);
+
+    // Fill in comparisation
+    if (!rt.conf.HasOptimization(OptimizationFlag::Unsafe_ScopedCMP)) {
+        comparison.first = CreateLoadFromPtr(rinst, &rt.comparison.first, rinst.builder->getInt64Ty(), "comp_left_");
+        comparison.second = CreateLoadFromPtr(rinst, &rt.comparison.second, rinst.builder->getInt64Ty(), "comp_right_");
+        dirty_comparison = false;
+    } else {
+        comparison.first = nullptr;
+        comparison.second = nullptr;
+    }
 }
 
 void Lifter::CreateRegisterSave(Instance& rinst) {
     // Write out stack pointer
     if (dirty_stack_pointer) {
-        Value *ptr = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<uint64_t>(&rt.SP)), rinst.builder->getPtrTy());
-        rinst.builder->CreateStore(stack_pointer, ptr);
+        CreateStoreToPtr(rinst, &rt.SP, stack_pointer);
     }
     dirty_stack_pointer = false;
 
@@ -47,8 +53,7 @@ void Lifter::CreateRegisterSave(Instance& rinst) {
     for (unsigned idx = 0; idx != registers.size(); ++idx) {
         if (!dirty_registers[idx])
             continue;
-        Value *ptr = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<uint64_t>(&rt.registers[idx])), rinst.builder->getPtrTy());
-        rinst.builder->CreateStore(registers[idx], ptr);
+        CreateStoreToPtr(rinst, &rt.registers[idx], registers[idx]);
     }
     dirty_registers.fill(false);
 
@@ -56,15 +61,29 @@ void Lifter::CreateRegisterSave(Instance& rinst) {
     for (unsigned idx = 0; idx != vectors.size(); ++idx) {
         if (!dirty_vectors[idx])
             continue;
-        Value *ptr = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<uint64_t>(&rt.vectors[idx])), rinst.builder->getPtrTy());
-        rinst.builder->CreateStore(vectors[idx], ptr);
+        CreateStoreToPtr(rinst, &rt.vectors[idx], vectors[idx]);
     }
     dirty_vectors.fill(false);
+
+    // Write out comparisation
+    if (dirty_comparison && !rt.conf.HasOptimization(OptimizationFlag::Unsafe_ScopedCMP)) {
+        CreateStoreToPtr(rinst, &rt.comparison.first, comparison.first);
+        CreateStoreToPtr(rinst, &rt.comparison.second, comparison.second);
+    }
+    dirty_comparison = false;
 }
 
 void Lifter::CreatePCSave(Instance& rinst) {
     Value *ptr = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<uint64_t>(&rt.PC)), rinst.builder->getPtrTy());
     rinst.builder->CreateStore(rinst.builder->getInt64(rinst.pc), ptr);
+}
+
+Value *Lifter::CreateLoadFromPtr(Instance& rinst, void *ptr, Type *type, const llvm::Twine& name) {
+    return rinst.builder->CreateLoad(type, rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<uint64_t>(ptr)), rinst.builder->getPtrTy()), name);
+}
+
+void Lifter::CreateStoreToPtr(Instance& rinst, void *ptr, llvm::Value *value) {
+    rinst.builder->CreateStore(value, rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<uint64_t>(ptr)), rinst.builder->getPtrTy()));
 }
 
 Value *Lifter::CreateMemoryLoad(Instance& rinst, llvm::Value *address, Type *type) {
