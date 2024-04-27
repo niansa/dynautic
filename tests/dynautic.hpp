@@ -91,7 +91,10 @@ public:
 
     void ExceptionRaised(u64 pc, ::Dynautic::A64::Exception exception) override {
         std::cerr << "Dynautic error: Exception raised at " << reinterpret_cast<void*>(pc) << ": " << static_cast<unsigned>(exception) << std::endl;
-        cpu->HaltExecution(Dynautic::HaltReason::UserDefined3);
+        if (exception == Dynautic::A64::Exception::UnallocatedEncoding || exception == Dynautic::A64::Exception::UnpredictableInstruction)
+            cpu->HaltExecution(Dynautic::HaltReason::UserDefined3);
+        else
+            cpu->HaltExecution(Dynautic::HaltReason::UserDefined7);
     }
 
     void AddTicks(u64 ticks) override {
@@ -161,9 +164,11 @@ public:
             cpu.SetPC(exe_base);
 
             // Execute
+            restart:
             const auto halt_reason = cpu.Run();
             switch (halt_reason) {
             case Dynautic::HaltReason::UserDefined4: break;
+            case Dynautic::HaltReason::UserDefined3: cpu.SetPC(cpu.GetPC()+4); goto restart;
             default: throw std::runtime_error("Dynautic error: Unexpected halt reasons: "+std::to_string(static_cast<uint32_t>(halt_reason)));
             }
 
