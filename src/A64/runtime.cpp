@@ -61,13 +61,15 @@ public:
 } g_LLVMInitSingleton;
 
 
-Runtime::Impl::Impl(UserConfig conf, Runtime *parent)
-      : parent(parent), raiser(*this), conf(conf) {
-    // Enforce disabled unsafe_optimizations
+Runtime::Impl::Impl(UserConfig conf_, Runtime *parent)
+      : parent(parent), raiser(*this), conf(conf_) {
+    // Enforce configuration restraints
     if (!conf.unsafe_optimizations) {
         conf.fully_static = false;
         conf.optimizations &= all_safe_optimizations;
     }
+    conf.use_cache = conf.use_cache && conf.HasOptimization(OptimizationFlag::BlockLinking);
+    conf.fully_static = conf.fully_static && conf.use_cache;
 
     // Create JIT engine
     CreateJit();

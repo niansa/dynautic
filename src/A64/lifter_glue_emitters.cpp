@@ -108,6 +108,7 @@ void Lifter::CreateCall(Instance& rinst, VAddr origin, VAddr address) {
     if (!rt.conf.HasOptimization(OptimizationFlag::BlockLinking))
         return CreateCall(rinst, origin, rinst.builder->getInt64(address));
 
+    // Prepare for call
     CreateRegisterSave(rinst);
     // Try to lift given instruction
     auto expected_address = Lift(address);
@@ -131,6 +132,10 @@ llvm::BasicBlock *Lifter::PrepareBranch(Instance& rinst, VAddr origin, Value *ad
     return block;
 }
 llvm::BasicBlock *Lifter::PrepareBranch(Instance& rinst, VAddr address) {
+    // Use dynamic branchif configured to
+    if (!rt.conf.HasOptimization(OptimizationFlag::BlockLinking))
+        return PrepareBranch(rinst, rinst.pc, rinst.builder->getInt64(address));
+
     return rinst.QueueBranch(address, "BranchAt"+std::to_string(address));
 }
 

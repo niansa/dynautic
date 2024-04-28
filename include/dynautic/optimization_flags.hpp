@@ -16,6 +16,7 @@ enum class OptimizationFlag : std::uint32_t {
     /// This is a safe optimization.
     BlockLinking = 0x00000001,
     /// This runs LLVM optimization steps on the generated IR.
+    /// This is a safe optimization.
     LLVMIROpt = 0x00000020,
 
     /// This is an UNSAFE optimization that reduces accuracy of fused multiply-add operations.
