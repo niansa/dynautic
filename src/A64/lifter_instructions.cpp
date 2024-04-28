@@ -265,8 +265,8 @@ bool Lifter::InstructionLifter::Run() {
         }
         }
         // Create branch
-        BasicBlock *true_block = rinst.CreateBasicBlock("conditional_true");
-        next_block = rinst.CreateBasicBlock("conditional_end");
+        BasicBlock *true_block = rinst.CreateBasicBlock("ConditionalPredTrue");
+        next_block = rinst.CreateBasicBlock("ConditionalPredEnd");
         rinst.builder->CreateCondBr(condition, true_block, next_block);
         rinst.UseBasicBlock(true_block);
     }

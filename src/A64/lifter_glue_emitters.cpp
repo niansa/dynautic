@@ -104,6 +104,10 @@ void Lifter::CreateCall(Instance& rinst, VAddr origin, llvm::Value *address) {
     CreateLiftTrampoline(rinst, origin, address);
 }
 void Lifter::CreateCall(Instance& rinst, VAddr origin, VAddr address) {
+    // Use deferring lift if configured to
+    if (!rt.conf.HasOptimization(OptimizationFlag::BlockLinking))
+        return CreateCall(rinst, origin, rinst.builder->getInt64(address));
+
     CreateRegisterSave(rinst);
     // Try to lift given instruction
     auto expected_address = Lift(address);

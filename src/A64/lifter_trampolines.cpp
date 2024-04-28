@@ -11,15 +11,15 @@ namespace Dynautic::A64 {
 namespace {
 void LiftTrampoline(Lifter& self, VAddr addr, bool no_cache) {
     self.rt.UpdateExecutionState();
-    using Function = void(void);
+    // This is the wrong signature, but still valid (hopefully). It's needed to enforce tail call optimization
+    using Function = decltype(LiftTrampoline);
     Function *fnc;
     {
         auto executor_address = self.Lift(addr, no_cache);
         DYNAUTIC_ASSERT(executor_address.has_value());
-        fnc = executor_address->toPtr<void(void)>();
+        fnc = executor_address->toPtr<Function>();
     }
-    fnc();
-    self.rt.UpdateExecutionState();
+    __attribute__((musttail)) return fnc(self, addr, no_cache);
 }
 
 void SvcTrampoline(Runtime::Impl& rt, uint32_t swi) {
