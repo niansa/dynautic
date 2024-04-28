@@ -115,6 +115,13 @@ class Lifter {
 
     static std::string GetFunctionName(VAddr addr);
 
+    /// This function starts lifting code at given address. It then returns a pointer to the function
+    /// generated from that address. It might however also generate functions called by code at given
+    /// address.
+    /// Normally, this function returns an address on success.
+    /// But when nested (called recursively) it never returns an address. Instead, it returns nothing
+    /// after lifting. The generated function(s) will still be available right after calling if the
+    /// function didn't fail (which it in no situation should).
     std::optional<llvm::orc::ExecutorAddr> Lift(VAddr addr, bool allow_nested);
 
 public:
