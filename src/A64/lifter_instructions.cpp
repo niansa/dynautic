@@ -189,11 +189,12 @@ bool Lifter::InstructionLifter::Run() {
     rinst.pc = insn.address;
 
     // Handle conditional predicates
+    const RuntimeValues rt_values_backup = p.rt_values;
     BasicBlock *next_block = nullptr;
     const bool conditional = detail.cc != AArch64CC_Invalid;
     if (conditional) {
         Value *condition;
-        auto [left, right] = p.comparison;
+        auto [left, right] = p.rt_values.comparison;
         if (!left || !right) {
             DYNAUTIC_ASSERT(!"Unknown comparison values");
             if (rinst.rt.conf.unsafe_unexpected_situation_handling) {
@@ -251,10 +252,10 @@ bool Lifter::InstructionLifter::Run() {
             condition = rinst.builder->CreateICmpSLE(left, right);
         } break;
         case AArch64CC_AL: {
-            condition = condition = rinst.builder->getInt1(true);
+            condition = rinst.builder->getInt1(true);
         } break;
         case AArch64CC_NV: {
-            condition = condition = rinst.builder->getInt1(false);
+            condition = rinst.builder->getInt1(false);
         } break;
         default: {
             DYNAUTIC_ASSERT(!"Unknown comparison code");
@@ -428,9 +429,9 @@ bool Lifter::InstructionLifter::Run() {
         } break;
         case AArch64_INS_ALIAS_CMP: {
             const auto ops = GetOps(2);
-            p.comparison.first = p.GetRegisterView(rinst, ops[0]);
-            p.comparison.second = p.GetRegisterView(rinst, ops[1]);
-            p.dirty_comparison = true;
+            p.rt_values.comparison.first = p.GetRegisterView(rinst, ops[0]);
+            p.rt_values.comparison.second = p.GetRegisterView(rinst, ops[1]);
+            p.rt_values.dirty_comparison = true;
         }; break;
         // Load and store instructions
         case AArch64_INS_ALIAS_LDUR:
@@ -556,13 +557,13 @@ bool Lifter::InstructionLifter::Run() {
         return;
     }();
 
-    // Switch to next block if not terminated
+    // Switch to next block if not terminated and restore runtime values
     if (next_block) {
         if (!rinst.block_terminated) {
             rinst.builder->CreateBr(next_block);
         }
         rinst.UseBasicBlock(next_block);
-
+        p.rt_values = rt_values_backup;
     }
 
     return !rinst.block_terminated;

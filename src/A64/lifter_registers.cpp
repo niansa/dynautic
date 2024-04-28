@@ -68,12 +68,12 @@ std::string RegisterDescription::GetName() const {
 
 
 void Lifter::ResetScratchRegisters() {
-    scratch_registers.fill(nullptr);
+    rt_values.scratch_registers.fill(nullptr);
 }
 
 RegisterDescription Lifter::AllocateScratchRegister(bool as_word) {
-    for (unsigned idx = 0; idx != scratch_registers.size(); ++idx)
-        if (!scratch_registers[idx])
+    for (unsigned idx = 0; idx != rt_values.scratch_registers.size(); ++idx)
+        if (!rt_values.scratch_registers[idx])
             return {idx, as_word};
 
     DYNAUTIC_ASSERT(!"Out of scratch registers");
@@ -81,20 +81,20 @@ RegisterDescription Lifter::AllocateScratchRegister(bool as_word) {
 
 Value *&Lifter::GetRawRegister(RegisterDescription desc, bool allow_store_to) {
     switch (desc.type) {
-    case RegisterDescription::Type::scratch: return scratch_registers[desc.idx];
+    case RegisterDescription::Type::scratch: return rt_values.scratch_registers[desc.idx];
     case RegisterDescription::Type::general: {
         if (allow_store_to)
-            dirty_registers[desc.idx] = true;
-        return registers[desc.idx];
+            rt_values.dirty_registers[desc.idx] = true;
+        return rt_values.registers[desc.idx];
     } break;
     case RegisterDescription::Type::stack_pointer: {
         if (allow_store_to)
-            dirty_stack_pointer = true;
-        return stack_pointer;
+            rt_values.dirty_stack_pointer = true;
+        return rt_values.stack_pointer;
     }
     default: {
         DYNAUTIC_ASSERT(!"Unsupported register type");
-        // We'll create a null pointer instead, hoping it'll never be used
+        // We create a null pointer instead, hoping it's not going to be used
         static Value *invalid_value;
         invalid_value = nullptr;
         return invalid_value;

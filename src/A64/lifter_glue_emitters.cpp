@@ -16,61 +16,61 @@ using namespace llvm::orc;
 namespace Dynautic::A64 {
 void Lifter::CreateRegisterRestore(Instance& rinst) {
     // Fill in stack pointer
-    stack_pointer = CreateLoadFromPtr(rinst, &rt.SP, rinst.builder->getInt64Ty(), "sp_");
-    dirty_stack_pointer = false;
+    rt_values.stack_pointer = CreateLoadFromPtr(rinst, &rt.SP, rinst.builder->getInt64Ty(), "sp_");
+    rt_values.dirty_stack_pointer = false;
 
     // Fill in general purpose registers
-    for (unsigned idx = 0; idx != registers.size(); ++idx) {
-        registers[idx] = CreateLoadFromPtr(rinst, &rt.registers[idx], rinst.builder->getInt64Ty(), "r"+std::to_string(idx)+'_');
+    for (unsigned idx = 0; idx != rt_values.registers.size(); ++idx) {
+        rt_values.registers[idx] = CreateLoadFromPtr(rinst, &rt.registers[idx], rinst.builder->getInt64Ty(), "r"+std::to_string(idx)+'_');
     }
-    dirty_registers.fill(false);
+    rt_values.dirty_registers.fill(false);
 
     // Fill in vector registers
-    for (unsigned idx = 0; idx != vectors.size(); ++idx) {
-        vectors[idx] = CreateLoadFromPtr(rinst, &rt.vectors[idx], rinst.builder->getInt128Ty(), "d"+std::to_string(idx)+'_');
+    for (unsigned idx = 0; idx != rt_values.vectors.size(); ++idx) {
+        rt_values.vectors[idx] = CreateLoadFromPtr(rinst, &rt.vectors[idx], rinst.builder->getInt128Ty(), "d"+std::to_string(idx)+'_');
     }
-    dirty_vectors.fill(false);
+    rt_values.dirty_vectors.fill(false);
 
     // Fill in comparisation
     if (!rt.conf.HasOptimization(OptimizationFlag::Unsafe_ScopedCMP)) {
-        comparison.first = CreateLoadFromPtr(rinst, &rt.comparison.first, rinst.builder->getInt64Ty(), "comp_left_");
-        comparison.second = CreateLoadFromPtr(rinst, &rt.comparison.second, rinst.builder->getInt64Ty(), "comp_right_");
-        dirty_comparison = false;
+        rt_values.comparison.first = CreateLoadFromPtr(rinst, &rt.comparison.first, rinst.builder->getInt64Ty(), "comp_left_");
+        rt_values.comparison.second = CreateLoadFromPtr(rinst, &rt.comparison.second, rinst.builder->getInt64Ty(), "comp_right_");
+        rt_values.dirty_comparison = false;
     } else {
-        comparison.first = nullptr;
-        comparison.second = nullptr;
+        rt_values.comparison.first = nullptr;
+        rt_values.comparison.second = nullptr;
     }
 }
 
 void Lifter::CreateRegisterSave(Instance& rinst) {
     // Write out stack pointer
-    if (dirty_stack_pointer) {
-        CreateStoreToPtr(rinst, &rt.SP, stack_pointer);
+    if (rt_values.dirty_stack_pointer) {
+        CreateStoreToPtr(rinst, &rt.SP, rt_values.stack_pointer);
     }
-    dirty_stack_pointer = false;
+    rt_values.dirty_stack_pointer = false;
 
     // Write out general purpose registers
-    for (unsigned idx = 0; idx != registers.size(); ++idx) {
-        if (!dirty_registers[idx])
+    for (unsigned idx = 0; idx !=rt_values. registers.size(); ++idx) {
+        if (!rt_values.dirty_registers[idx])
             continue;
-        CreateStoreToPtr(rinst, &rt.registers[idx], registers[idx]);
+        CreateStoreToPtr(rinst, &rt.registers[idx], rt_values.registers[idx]);
     }
-    dirty_registers.fill(false);
+    rt_values.dirty_registers.fill(false);
 
     // Write out vector registers
-    for (unsigned idx = 0; idx != vectors.size(); ++idx) {
-        if (!dirty_vectors[idx])
+    for (unsigned idx = 0; idx != rt_values.vectors.size(); ++idx) {
+        if (!rt_values.dirty_vectors[idx])
             continue;
-        CreateStoreToPtr(rinst, &rt.vectors[idx], vectors[idx]);
+        CreateStoreToPtr(rinst, &rt.vectors[idx], rt_values.vectors[idx]);
     }
-    dirty_vectors.fill(false);
+    rt_values.dirty_vectors.fill(false);
 
     // Write out comparisation
-    if (dirty_comparison && !rt.conf.HasOptimization(OptimizationFlag::Unsafe_ScopedCMP)) {
-        CreateStoreToPtr(rinst, &rt.comparison.first, comparison.first);
-        CreateStoreToPtr(rinst, &rt.comparison.second, comparison.second);
+    if (rt_values.dirty_comparison && !rt.conf.HasOptimization(OptimizationFlag::Unsafe_ScopedCMP)) {
+        CreateStoreToPtr(rinst, &rt.comparison.first, rt_values.comparison.first);
+        CreateStoreToPtr(rinst, &rt.comparison.second, rt_values.comparison.second);
     }
-    dirty_comparison = false;
+    rt_values.dirty_comparison = false;
 }
 
 void Lifter::CreatePCSave(Instance& rinst) {

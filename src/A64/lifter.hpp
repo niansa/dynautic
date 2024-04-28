@@ -54,15 +54,17 @@ class Lifter {
     /// Top instance holding context and module for nested Lift() calls.
     Instance *top_instance = nullptr;
 
-    std::array<llvm::Value *, 4> scratch_registers;
-    std::array<llvm::Value *, 31> registers;
-    std::array<bool, 31> dirty_registers;
-    std::array<llvm::Value *, 32> vectors;
-    std::array<bool, 32> dirty_vectors;
-    llvm::Value *stack_pointer;
-    bool dirty_stack_pointer{};
-    std::pair<llvm::Value *, llvm::Value *> comparison;
-    bool dirty_comparison{};
+    struct RuntimeValues {
+        std::array<llvm::Value *, 4> scratch_registers;
+        std::array<llvm::Value *, 31> registers;
+        std::array<bool, 31> dirty_registers;
+        std::array<llvm::Value *, 32> vectors;
+        std::array<bool, 32> dirty_vectors;
+        llvm::Value *stack_pointer;
+        bool dirty_stack_pointer{};
+        std::pair<llvm::Value *, llvm::Value *> comparison;
+        bool dirty_comparison{};
+    } rt_values;
 
     void ResetScratchRegisters();
     RegisterDescription AllocateScratchRegister(bool as_word);
