@@ -111,11 +111,7 @@ void Lifter::CreateCall(Instance& rinst, VAddr origin, VAddr address) {
     // Prepare for call
     CreateRegisterSave(rinst);
     // Try to lift given instruction
-    auto expected_address = Lift(address);
-    // Fall back to deferring lift without cache if failed
-    if (!expected_address)
-        return CreateCall(rinst, origin, rinst.builder->getInt64(address), true);
-
+    LiftNested(address);
     // Call into lifted address
     rinst.builder->CreateCall(Lifter::GetLiftedFunction(rinst, address))->setTailCall();
     rinst.builder->CreateRetVoid();
@@ -213,7 +209,7 @@ void Lifter::CreateLiftTrampolineBlock(Instance& rinst, VAddr origin, bool no_ca
     Value *self = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(this)), rinst.builder->getPtrTy());
 
     if (!rt.conf.fully_static)
-        rinst.builder->CreateCall(GetLiftTrampoline(rinst), {self, address, rinst.builder->getInt8(no_cache)})->setTailCall();
+        rinst.builder->CreateCall(GetLiftTrampoline(rinst), {self, address})->setTailCall();
     rinst.builder->CreateRetVoid();
     rinst.block_terminated = true;
 }

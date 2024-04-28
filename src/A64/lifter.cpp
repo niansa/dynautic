@@ -40,7 +40,7 @@ FunctionCallee Lifter::GetLiftedFunction(Instance& rinst, VAddr addr) {
     return rinst.DeclareFunction(GetFunctionName(addr));
 }
 
-std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
+std::optional<ExecutorAddr> Lifter::Lift(VAddr addr, bool allow_nested) {
     DYNAUTIC_ASSERT(IsOk());
 
     if (IsLiftPending(addr))
@@ -49,19 +49,45 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
     // Get module name
     const std::string function_name = GetFunctionName(addr);
 
-    // Try cache first
+    // Try existing functions in compiled modules first
     if (auto executor_addr = rt.jit->lookup(function_name))
         return executor_addr.get();
 
-    // Create context
-    auto context = std::make_unique<LLVMContext>();
+    // Check if nested
+    const bool nested = top_instance != nullptr;
+    assert(!(nested && !allow_nested));
 
-    // Create new module
-    auto module = std::make_unique<Module>("ModuleAt"+std::to_string(addr), *context);
+    // Set up context and module
+    std::unique_ptr<LLVMContext> unique_context;
+    std::unique_ptr<Module> unique_module;
+    LLVMContext *context;
+    Module *module;
+
+    if (!nested) {
+        // Create context
+        unique_context = std::make_unique<LLVMContext>();
+        context = unique_context.get();
+
+        // Create new module
+        unique_module = std::make_unique<Module>("ModuleAt"+std::to_string(addr), *context);
+        module = unique_module.get();
+    } else {
+        // Copy context and module from top instance
+        context = top_instance->context;
+        module = top_instance->module;
+
+        // Try exiting functions in current module first
+        if (module->getFunction(function_name))
+            return {};
+    }
 
     // Create entry block and branch
-    Instance rinst(rt, context.get(), module.get(), function_name);
+    Instance rinst(rt, context, module, function_name);
     rinst.QueueBranch(addr, "EntryBlock");
+
+    // Set as top instance if not nested
+    if (!nested)
+        top_instance = &rinst;
 
     // Lift each leaf until none are left
     pending.push_back(addr);
@@ -75,28 +101,36 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
     }
     pending.remove(addr);
 
-    // Dump generated IR if enabled
-    if (rt.conf.dump_assembly)
-        outs() << *module;
+    // Finalize module only if not nested
+    if (!nested) {
+        top_instance = nullptr;
 
-#ifdef ENABLE_LLVM_VALIDATION
-    // Run verifier
-    VerifierAnalysis verifier;
-    ModuleAnalysisManager analysisManager;
-    auto verifierResult = verifier.run(*module, analysisManager);
-    if (verifierResult.IRBroken)
-        errs() << "Module is broken!\n";
+        // Dump generated IR if enabled
+        if (rt.conf.dump_assembly)
+            outs() << *module;
 
-#endif
-    // Add module to JIT
-    auto error = rt.jit->addIRModule(ThreadSafeModule(std::move(module), std::move(context)));
-    if (error) {
-        errs() << "Failed to add module: " << error << '\n';
-        return {};
+        #ifdef ENABLE_LLVM_VALIDATION
+        // Run verifier
+        VerifierAnalysis verifier;
+        ModuleAnalysisManager analysisManager;
+        auto verifierResult = verifier.run(*module, analysisManager);
+        if (verifierResult.IRBroken)
+            errs() << "Module is broken!\n";
+
+        #endif
+        // Add module to JIT
+        auto error = rt.jit->addIRModule(ThreadSafeModule(std::move(unique_module), std::move(unique_context)));
+        if (error) {
+            errs() << "Failed to add module: " << error << '\n';
+            return {};
+        }
+
+        // Look up added function and return address
+        return rt.jit->lookup(function_name).get();
     }
 
-    // Look up added function and return address
-    return rt.jit->lookup(function_name).get();
+    // Return nothing since we're nested
+    return {};
 }
 
 void Lifter::LiftLeaf(Instance& rinst, VAddr addr) {

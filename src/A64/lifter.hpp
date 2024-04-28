@@ -51,6 +51,9 @@ class Lifter {
 
     std::list<VAddr> pending;
 
+    /// Top instance holding context and module for nested Lift() calls.
+    Instance *top_instance = nullptr;
+
     std::array<llvm::Value *, 4> scratch_registers;
     std::array<llvm::Value *, 31> registers;
     std::array<bool, 31> dirty_registers;
@@ -112,6 +115,8 @@ class Lifter {
 
     static std::string GetFunctionName(VAddr addr);
 
+    std::optional<llvm::orc::ExecutorAddr> Lift(VAddr addr, bool allow_nested);
+
 public:
     Runtime::Impl& rt;
 
@@ -132,6 +137,12 @@ public:
 
     static llvm::FunctionCallee GetLiftedFunction(Instance&, VAddr addr);
 
-    std::optional<llvm::orc::ExecutorAddr> Lift(VAddr addr);
+    std::optional<llvm::orc::ExecutorAddr> Lift(VAddr addr) {
+        return Lift(addr, false);
+    }
+    void LiftNested(VAddr addr) {
+        Lift(addr, true);
+    }
+
 };
 }
