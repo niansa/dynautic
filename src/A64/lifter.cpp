@@ -40,19 +40,18 @@ FunctionCallee Lifter::GetLiftedFunction(Instance& rinst, VAddr addr) {
     return rinst.DeclareFunction(GetFunctionName(addr));
 }
 
-std::optional<ExecutorAddr> Lifter::Lift(VAddr addr, bool no_cache) {
+std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
     DYNAUTIC_ASSERT(IsOk());
 
-    if (!no_cache && IsLiftPending(addr))
+    if (IsLiftPending(addr))
         return {};
 
     // Get module name
     const std::string function_name = GetFunctionName(addr);
 
     // Try cache first
-    if (!no_cache)
-        if (auto executor_addr = rt.jit->lookup(function_name))
-            return executor_addr.get();
+    if (auto executor_addr = rt.jit->lookup(function_name))
+        return executor_addr.get();
 
     // Create context
     auto context = std::make_unique<LLVMContext>();

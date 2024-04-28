@@ -132,6 +132,6 @@ public:
 
     static llvm::FunctionCallee GetLiftedFunction(Instance&, VAddr addr);
 
-    std::optional<llvm::orc::ExecutorAddr> Lift(VAddr addr, bool no_cache = false);
+    std::optional<llvm::orc::ExecutorAddr> Lift(VAddr addr);
 };
 }
