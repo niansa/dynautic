@@ -9,17 +9,17 @@
 
 namespace Dynautic::A64 {
 namespace {
-void LiftTrampoline(Lifter& self, VAddr addr, bool no_cache) {
+void LiftTrampoline(Lifter& self, VAddr addr) {
     self.rt.UpdateExecutionState();
     // This is the wrong signature, but still valid (hopefully). It's needed to enforce tail call optimization
     using Function = decltype(LiftTrampoline);
     Function *fnc;
     {
-        auto executor_address = self.Lift(addr, no_cache);
+        auto executor_address = self.Lift(addr);
         DYNAUTIC_ASSERT(executor_address.has_value());
         fnc = executor_address->toPtr<Function>();
     }
-    __attribute__((musttail)) return fnc(self, addr, no_cache);
+    __attribute__((musttail)) return fnc(self, addr);
 }
 
 void SvcTrampoline(Runtime::Impl& rt, uint32_t swi) {
@@ -190,7 +190,7 @@ llvm::FunctionCallee Lifter::GetMemoryWrite(Instance& rinst, uint8_t bits) {
 }
 
 llvm::FunctionCallee Lifter::GetLiftTrampoline(Instance& rinst) {
-    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty(), rinst.builder->getInt8Ty()}, false);
+    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty()}, false);
     return rinst.module->getOrInsertFunction("LiftTrampoline", ftype);
 }
 

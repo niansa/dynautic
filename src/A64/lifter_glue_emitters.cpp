@@ -100,8 +100,8 @@ void Lifter::CreateMemoryStore(Instance& rinst, llvm::Value *address, llvm::Valu
         rinst.builder->CreateCall(GetUpdateExecutionStateTrampoline(rinst), {runtime});
 }
 
-void Lifter::CreateCall(Instance& rinst, VAddr origin, llvm::Value *address) {
-    CreateLiftTrampoline(rinst, origin, address);
+void Lifter::CreateCall(Instance& rinst, VAddr origin, llvm::Value *address, bool no_cache) {
+    CreateLiftTrampoline(rinst, origin, address, no_cache);
 }
 void Lifter::CreateCall(Instance& rinst, VAddr origin, VAddr address) {
     // Use deferring lift if configured to
@@ -112,11 +112,9 @@ void Lifter::CreateCall(Instance& rinst, VAddr origin, VAddr address) {
     CreateRegisterSave(rinst);
     // Try to lift given instruction
     auto expected_address = Lift(address);
-    if (!expected_address) {
-        // Fall back to deferring lift
-        CreateCall(rinst, origin, rinst.builder->getInt64(address));
-        return;
-    }
+    // Fall back to deferring lift without cache if failed
+    if (!expected_address)
+        return CreateCall(rinst, origin, rinst.builder->getInt64(address), true);
 
     // Call into lifted address
     rinst.builder->CreateCall(Lifter::GetLiftedFunction(rinst, address))->setTailCall();
@@ -232,7 +230,7 @@ void Lifter::CreateLiftTrampoline(Instance& rinst, VAddr origin, Value *addr, bo
     Value *self = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(this)), rinst.builder->getPtrTy());
 
     if (!rt.conf.fully_static)
-        rinst.builder->CreateCall(GetLiftTrampoline(rinst), {self, addr, rinst.builder->getInt8(no_cache)})->setTailCall();
+        rinst.builder->CreateCall(GetLiftTrampoline(rinst), {self, addr})->setTailCall();
     rinst.builder->CreateRetVoid();
     rinst.block_terminated = true;
 }

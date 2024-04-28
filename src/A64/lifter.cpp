@@ -91,8 +91,10 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr, bool no_cache) {
 #endif
     // Add module to JIT
     auto error = rt.jit->addIRModule(ThreadSafeModule(std::move(module), std::move(context)));
-    if (error)
+    if (error) {
+        errs() << "Failed to add module: " << error << '\n';
         return {};
+    }
 
     // Look up added function and return address
     return rt.jit->lookup(function_name).get();
