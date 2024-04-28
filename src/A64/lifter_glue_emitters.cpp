@@ -74,8 +74,7 @@ void Lifter::CreateRegisterSave(Instance& rinst) {
 }
 
 void Lifter::CreatePCSave(Instance& rinst) {
-    Value *ptr = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<uint64_t>(&rt.PC)), rinst.builder->getPtrTy());
-    rinst.builder->CreateStore(rinst.builder->getInt64(rinst.pc), ptr);
+    CreateStoreToPtr(rinst, &rt.PC, rinst.builder->getInt64(rinst.pc));
 }
 
 Value *Lifter::CreateLoadFromPtr(Instance& rinst, void *ptr, Type *type, const llvm::Twine& name) {
@@ -244,7 +243,7 @@ void Lifter::CreateExceptionTrampoline(Instance& rinst, Exception exception) {
     CreateRegisterSave(rinst);
     CreatePCSave(rinst);
     rinst.builder->CreateCall(GetExceptionTrampoline(rinst), {runtime, rinst.builder->getInt64(rinst.pc), rinst.builder->getInt32(static_cast<uint32_t>(exception))});
-    CreateRegisterRestore(rinst);
+    CreateLiftTrampoline(rinst, rinst.pc, rinst.builder->getInt64(rinst.pc));
 }
 
 void Lifter::CreateFreezeTrampoline(Instance& rinst) {

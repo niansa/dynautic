@@ -219,6 +219,21 @@ int main(int argc, char** argv) {
                       0xd61f02e0, // br x23
                   }, unicorn.get());
 
+    dynautic->RunTest("Simple matching conditional jump using cmp instruction", {
+                      0xf109603f, // cmp x1, #600
+                      0x5400004c, // b.gt c
+                      0xd2800000, // mov x0, #0
+                      0xd65f03c0  // ret
+                  }, unicorn.get());
+
+    dynautic->RunTest("Simple non-matching conditional jump using cmp instruction", {
+                      0xf109603f, // cmp x1, #600
+                      0x54000040, // b.eq c
+                      0xd2800000, // mov x0, #0
+                      0xd65f03c0  // ret
+                  }, unicorn.get());
+
+
     for (const auto& entry : std::filesystem::directory_iterator(TEST_BINS)) {
         if (!entry.is_regular_file())
             continue;

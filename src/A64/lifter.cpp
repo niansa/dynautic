@@ -36,7 +36,7 @@ std::string Lifter::GetFunctionName(VAddr addr) {
     return "FncAt"+std::to_string(addr);
 }
 
-Function *Lifter::GetLiftedFunction(Instance& rinst, VAddr addr) {
+FunctionCallee Lifter::GetLiftedFunction(Instance& rinst, VAddr addr) {
     return rinst.DeclareFunction(GetFunctionName(addr));
 }
 

@@ -135,7 +135,7 @@ public:
 
             // Configure
             user_config.update_cache = !(user_config.use_cache = user_config.unsafe_optimizations = user_config.fully_static = !cache.empty());
-            //user_config.dump_assembly = user_config.fully_static;
+            user_config.dump_assembly = !user_config.fully_static;
 
             // Create runtime
             Dynautic::A64::Runtime cpu(user_config);

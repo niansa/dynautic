@@ -57,7 +57,7 @@ public:
         block_terminated = false; // Assume new block hasn't been terminated yet
     }
 
-    llvm::Function *DeclareFunction(const llvm::Twine& name);
+    llvm::FunctionCallee DeclareFunction(llvm::StringRef name);
 
     bool NextBranch();
 

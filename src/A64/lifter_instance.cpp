@@ -6,17 +6,17 @@ using namespace llvm::orc;
 
 
 namespace Dynautic::A64 {
-Lifter::Instance::Instance(Runtime::Impl &runtime, llvm::LLVMContext *context, llvm::Module *module, const llvm::Twine& function_name)
+Lifter::Instance::Instance(Runtime::Impl& runtime, llvm::LLVMContext *context, llvm::Module *module, const llvm::Twine& function_name)
       : rt(runtime), context(context), module(module) {
-    func = DeclareFunction(function_name);
+    func = Function::Create(FunctionType::get(Type::getVoidTy(*context),
+                                              {}, false),
+                            Function::ExternalLinkage, function_name, module);
+    func->setCallingConv(CallingConv::Tail);
 }
 
-Function *Lifter::Instance::DeclareFunction(const llvm::Twine &name) {
-    auto func = Function::Create(FunctionType::get(Type::getVoidTy(*context),
-                                                   {}, false),
-                                 Function::ExternalLinkage, name, module);
-    func->setCallingConv(CallingConv::Tail);
-    return func;
+llvm::FunctionCallee Lifter::Instance::DeclareFunction(llvm::StringRef name) {
+    return module->getOrInsertFunction(name, FunctionType::get(Type::getVoidTy(*context),
+                                                               {}, false));
 }
 
 bool Lifter::Instance::NextBranch() {
