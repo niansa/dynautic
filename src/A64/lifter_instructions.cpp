@@ -550,7 +550,6 @@ bool Lifter::InstructionLifter::Run() {
             // Bad instruction, check if noexec address
             const bool noexec = std::find(noexec_addrs.begin(), noexec_addrs.end(), insn.address) != noexec_addrs.end();
             p.CreateExceptionTrampoline(rinst, noexec?Exception::NoExecuteFault:Exception::UnallocatedEncoding);
-            DeferCompilation(true);
             return;
         }
         }
