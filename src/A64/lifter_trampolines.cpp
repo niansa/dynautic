@@ -19,7 +19,12 @@ void LiftTrampoline(Lifter& self, VAddr addr) {
         DYNAUTIC_ASSERT(executor_address.has_value());
         fnc = executor_address->toPtr<Function>();
     }
-    __attribute__((musttail)) return fnc(self, addr);
+#ifdef __clang__
+    __attribute__((musttail))
+#else
+#   warning "GCC does not support musttail, LiftTrampoline stack overhead may be increased"
+#endif
+    return fnc(self, addr);
 }
 
 void SvcTrampoline(Runtime::Impl& rt, uint32_t swi) {
