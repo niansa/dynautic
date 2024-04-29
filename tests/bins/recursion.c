@@ -1,7 +1,6 @@
 void test(unsigned *x);
 
-unsigned _start() {
-    unsigned fres = 0;
+unsigned _start(unsigned fres) {
     test(&fres);
     return fres;
 }

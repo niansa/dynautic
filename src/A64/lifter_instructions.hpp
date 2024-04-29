@@ -30,6 +30,8 @@ class Lifter::InstructionLifter {
 
     std::array<RegisterDescription, GetOps_max_op_count> GetOps(unsigned op_count);
 
+    llvm::Value *GetCondition();
+
     void CreateCall(unsigned op_idx = 0);
     llvm::BasicBlock *PrepareBranch(unsigned op_idx = 0);
 
