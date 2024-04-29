@@ -12,6 +12,9 @@ SECTIONS
 {
     . = 0x10;
 
+    .start : {
+        *(.start .start.*)
+    } :text
     .text : {
         *(.text .text.*)
     } :text

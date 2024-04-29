@@ -1,3 +1,4 @@
+__attribute__((section(".start")))
 unsigned long start_(unsigned long value) {
     value += 12;
     value /= 7;

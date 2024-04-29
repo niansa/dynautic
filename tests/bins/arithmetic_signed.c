@@ -1,3 +1,4 @@
+__attribute__((section(".start")))
 long start_(long value, long value2) {
     const long value3 = value;
     value -= value+value;

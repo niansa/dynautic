@@ -1,5 +1,6 @@
 void test(unsigned long *x);
 
+__attribute__((section(".start")))
 unsigned long _start() {
     unsigned long fres;
     test(&fres);

@@ -1,3 +1,4 @@
+__attribute__((section(".start")))
 unsigned long start_(unsigned long value, unsigned long value2) {
     const unsigned long value3 = value;
     value += value2;
