@@ -54,4 +54,18 @@ BasicBlock *Lifter::Instance::QueueDynamicBranch(VAddr *&addr, VAddr origin, con
     addr = &branch->addr;
     return queued_branches.emplace(branches.emplace_back(std::move(branch)).get())->basic_block;
 }
+
+Type *Lifter::Instance::GetType(uint8_t bits) {
+    switch (bits) {
+    case 1: return builder->getInt1Ty();
+    case 8: return builder->getInt8Ty();
+    case 16: return builder->getInt16Ty();
+    case 32: return builder->getInt32Ty();
+    case 64: return builder->getInt64Ty();
+    case 128: return builder->getInt128Ty();
+    }
+
+    DYNAUTIC_ASSERT(!"Invalid bit count");
+    return nullptr;
+}
 }

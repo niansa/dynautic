@@ -16,23 +16,44 @@ struct RegisterDescription {
         invalid,
         scratch,
         general,
+        vector,
         stack_pointer
     } type = Type::invalid;
 
-    bool isWord = false;
-    bool integer = false;
+    enum Size : uint8_t {
+        single = 32,
+        word = 32,
+        double_ = 64,
+        double_word = 64,
+        quad = 128
+    };
+    uint8_t size = Size::double_word;
+
     int idx;
 
     RegisterDescription() {}
     RegisterDescription(const char *name);
     RegisterDescription(csh handle, aarch64_reg reg);
-    RegisterDescription(unsigned scratchIdx, bool isWord) : type(Type::scratch), isWord(isWord), integer(true), idx(scratchIdx) {}
+    RegisterDescription(unsigned scratchIdx, bool isWord) : type(Type::scratch), size(isWord?Size::word:Size::double_word), idx(scratchIdx) {}
 
     bool operator==(RegisterDescription o) const {
-        return idx == o.idx && isWord == o.isWord && type == o.type;
+        return idx == o.idx && size == o.size && type == o.type;
     }
     bool operator!=(RegisterDescription o) const {
-        return idx != o.idx || isWord != o.isWord || type != o.type;
+        return idx != o.idx || size != o.size || type != o.type;
+    }
+
+    uint8_t GetFullTypeSize() const {
+        switch (type) {
+        case Type::scratch: return 128;
+        case Type::general: return 64;
+        case Type::vector: return 128;
+        case Type::stack_pointer: return 64;
+        default: {
+            DYNAUTIC_ASSERT(!"Invalid register type");
+            return 0;
+        }
+        }
     }
 
     std::string GetName() const;

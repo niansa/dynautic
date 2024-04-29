@@ -76,6 +76,8 @@ public:
     VAddr *GetBranchAddrPtr() {
         return &branch->addr;
     }
+
+    llvm::Type *GetType(uint8_t bits);
 };
 }
 

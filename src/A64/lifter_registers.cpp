@@ -11,15 +11,17 @@ namespace Dynautic::A64 {
 RegisterDescription::RegisterDescription(const char *name) {
     if (std::string_view(name) == "sp") {
         type = Type::stack_pointer;
-        integer = true;
         idx = 0;
         return;
     }
 
     switch (name[0]) {
-    case 'w': isWord = true; [[fallthrough]];
+    case 'w': size = Size::word; type = Type::general; break;
     case 'r': [[fallthrough]];
-    case 'x': type = Type::general; integer = true; break;
+    case 'x': size = Size::double_word; type = Type::general; break;
+    case 's': size = Size::single; type = Type::vector; break;
+    case 'd': size = Size::double_; type = Type::vector; break;
+    case 'q': size = Size::quad; type = Type::vector; break;
     }
 
     switch (type) {
@@ -47,10 +49,10 @@ std::string RegisterDescription::GetName() const {
     // Get prefix
     switch (type) {
     case Type::general: {
-        fres.push_back(isWord?'w':'x');
+        fres.push_back((size==Size::word)?'w':'x');
     } break;
     case Type::scratch: {
-        fres.append(isWord?"scratch32_":"scratch64_");
+        fres.append((size==Size::word)?"scratch32_":"scratch64_");
     } break;
     case Type::stack_pointer: return "sp_";
     default: DYNAUTIC_ASSERT(!"Unsupported register type");
@@ -87,6 +89,11 @@ Value *&Lifter::GetRawRegister(RegisterDescription desc, bool allow_store_to) {
             rt_values.dirty_registers[desc.idx] = true;
         return rt_values.registers[desc.idx];
     } break;
+    case RegisterDescription::Type::vector: {
+        if (allow_store_to)
+            rt_values.dirty_vectors[desc.idx] = true;
+        return rt_values.vectors[desc.idx];
+    } break;
     case RegisterDescription::Type::stack_pointer: {
         if (allow_store_to)
             rt_values.dirty_stack_pointer = true;
@@ -103,72 +110,60 @@ Value *&Lifter::GetRawRegister(RegisterDescription desc, bool allow_store_to) {
 }
 
 Value *Lifter::GetRegisterView(Instance& rinst, RegisterDescription desc) {
-    if (desc.type == RegisterDescription::Type::invalid)
-        goto invalid;
-
-    if (desc.integer) {
-        // Handle zero register
-        if (desc.IsZero())
-            return desc.isWord?rinst.builder->getInt32(0):rinst.builder->getInt64(0);
-        // Get real register from list
-        Value *fres = GetRawRegister(desc, false);
-        // Truncate to 32 bit as needed
-        if (desc.isWord) {
-            fres = rinst.builder->CreateTrunc(fres, rinst.builder->getInt32Ty());
-        }
-        return fres;
+    if (desc.type == RegisterDescription::Type::invalid) {
+        DYNAUTIC_ASSERT(!"Invalid register type");
+        if (rt.conf.unsafe_unexpected_situation_handling)
+            return rinst.builder->getInt32(0);
+        else
+            CreateExceptionTrampoline(rinst, Exception::UnpredictableInstruction);
     }
 
-    invalid:
-    DYNAUTIC_ASSERT(!"Unsupported register type");
-    if (rt.conf.unsafe_unexpected_situation_handling)
-        return rinst.builder->getInt32(0);
-    else
-        CreateExceptionTrampoline(rinst, Exception::UnpredictableInstruction);
+    // Handle zero register
+    if (desc.IsZero())
+        return ConstantInt::get(rinst.GetType(desc.size), 0);
+    // Get real register from list
+    Value *fres = GetRawRegister(desc, false);
+    // Truncate as needed
+    fres = rinst.builder->CreateTrunc(fres, rinst.GetType(desc.size));
+    return fres;
+
 }
 
 Value *Lifter::StoreRegister(Instance& rinst, RegisterDescription desc, llvm::Value *value, aarch64_shifter shift_type, uint8_t shift) {
-    if (desc.type == RegisterDescription::Type::invalid)
-        goto invalid;
-
-    if (desc.integer) {
-        // Get real register from list
-        Value *&fres = GetRawRegister(desc, true);
-        // Apply shift to value
-        value = PerformShift(rinst, value, shift_type, shift);
-        // Set value after casting to 64bit
-        fres = rinst.builder->CreateIntCast(value, rinst.builder->getInt64Ty(), false, desc.GetName());
-        return fres;
+    if (desc.type == RegisterDescription::Type::invalid) {
+        DYNAUTIC_ASSERT(!"Invalid register type");
+        if (rt.conf.unsafe_unexpected_situation_handling)
+            return rinst.builder->getInt32(0);
+        else
+            CreateExceptionTrampoline(rinst, Exception::UnpredictableInstruction);
     }
 
-invalid:
-    DYNAUTIC_ASSERT(!"Unsupported register type");
-    if (rt.conf.unsafe_unexpected_situation_handling)
-        return rinst.builder->getInt32(0);
-    else
-        CreateExceptionTrampoline(rinst, Exception::UnpredictableInstruction);
+    // Get real register from list
+    Value *&fres = GetRawRegister(desc, true);
+    // Apply shift to value
+    value = PerformShift(rinst, value, shift_type, shift);
+    // Set value after casting to full size
+    fres = rinst.builder->CreateIntCast(value, rinst.GetType(desc.GetFullTypeSize()), false, desc.GetName());
+    return fres;
 }
 
 Value *Lifter::StoreRegister16(Instance& rinst, RegisterDescription desc, uint16_t value, bool keep, aarch64_shifter shift_type, uint8_t shift) {
-    if (desc.integer) {
-        Value *&fres = GetRawRegister(desc, true);
-        const uint8_t bits = desc.isWord?32:64;
-        if (keep) {
-            // Mask out existing bits
-            Value *mask = rinst.builder->getInt64(~(PerformShift(0xffff, bits, shift_type, shift)));
-            fres = rinst.builder->CreateAnd(fres, mask);
-            // Merge shifted value into result
-            fres = rinst.builder->CreateOr(fres, PerformShift(value, bits, shift_type, shift));
-            // Strip first 32bits if needed
-            if (desc.isWord)
-                fres = rinst.builder->CreateAnd(fres, 0xffffffff);
-        } else {
-            fres = rinst.builder->getInt64(PerformShift(value, bits, shift_type, shift));
-        }
-        fres->setName(desc.GetName());
-        return fres;
-    }
+    DYNAUTIC_ASSERT(desc.size != RegisterDescription::Size::quad);
 
-    DYNAUTIC_ASSERT(!"Unsupported register type");
+    Value *&fres = GetRawRegister(desc, true);
+    if (keep) {
+        // Mask out existing bits
+        Value *mask = rinst.builder->getInt64(~(PerformShift(0xffff, desc.size, shift_type, shift)));
+        fres = rinst.builder->CreateAnd(fres, mask);
+        // Merge shifted value into result
+        fres = rinst.builder->CreateOr(fres, PerformShift(value, desc.size, shift_type, shift));
+        // Strip first 32bits if needed
+        if (desc.size == RegisterDescription::word)
+            fres = rinst.builder->CreateAnd(fres, 0xffffffff);
+    } else {
+        fres = rinst.builder->getInt64(PerformShift(value, desc.size, shift_type, shift));
+    }
+    fres->setName(desc.GetName());
+    return fres;
 }
 }

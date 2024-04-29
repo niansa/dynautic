@@ -58,7 +58,7 @@ std::array<RegisterDescription, Lifter::InstructionLifter::GetOps_max_op_count> 
         } break;
         case AArch64_OP_IMM: {
             // Load from immediate
-            regs[op_idx] = GetImmAsReg(op, regs[0].isWord);
+            regs[op_idx] = GetImmAsReg(op, regs[0].size == RegisterDescription::word);
         } break;
         case AArch64_OP_MEM_REG: {
             // Add up references
@@ -66,8 +66,8 @@ std::array<RegisterDescription, Lifter::InstructionLifter::GetOps_max_op_count> 
             reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt32(op.mem.disp));
             // Load value from reference
             DYNAUTIC_ASSERT(op_idx != 0);
-            auto value_reg = p.AllocateScratchRegister(regs[0].isWord);
-            p.GetRawRegister(value_reg, true) = rinst.builder->CreateLoad(value_reg.isWord?rinst.builder->getInt32Ty():rinst.builder->getInt64Ty(), reference);
+            auto value_reg = p.AllocateScratchRegister(regs[0].size == RegisterDescription::word);
+            p.GetRawRegister(value_reg, true) = rinst.builder->CreateLoad(rinst.GetType(value_reg.size), reference);
             regs[op_idx] = value_reg;
         } break;
         case AArch64_OP_INVALID: {
@@ -337,7 +337,7 @@ bool Lifter::InstructionLifter::Run() {
                         right_imm16 = ~right_imm16;
                     p.StoreRegister16(rinst, left, right_imm16, extra_flags[0], shift_type, shift);
                 } else {
-                    p.StoreRegister(rinst, left, ConstantInt::get(left.isWord?rinst.builder->getInt32Ty():rinst.builder->getInt64Ty(), right_imm), shift_type, shift);
+                    p.StoreRegister(rinst, left, ConstantInt::get(rinst.GetType(left.size), right_imm), shift_type, shift);
                 }
             }
         } break;
@@ -454,7 +454,7 @@ bool Lifter::InstructionLifter::Run() {
         case AArch64_INS_LDR: {
             const auto op = GetOps(1)[0];
             auto [reference, displacement] = GetMemOpReference(extra_flags[0]);
-            p.StoreRegister(rinst, op, p.CreateMemoryLoad(rinst, rinst.builder->CreateAdd(reference, rinst.builder->getInt64(static_cast<uint64_t>(displacement))), op.isWord?rinst.builder->getInt32Ty():rinst.builder->getInt64Ty()));
+            p.StoreRegister(rinst, op, p.CreateMemoryLoad(rinst, rinst.builder->CreateAdd(reference, rinst.builder->getInt64(static_cast<uint64_t>(displacement))), rinst.GetType(op.size)));
         } break;
         case AArch64_INS_ALIAS_STUR:
         case AArch64_INS_STUR: extra_flags[0] = true; [[fallthrough]];
@@ -467,11 +467,11 @@ bool Lifter::InstructionLifter::Run() {
         case AArch64_INS_ALIAS_LDP:
         case AArch64_INS_LDP: {
             const auto ops = GetOps(2);
-            Type *type = ops[0].isWord?rinst.builder->getInt32Ty():rinst.builder->getInt64Ty();
+            Type *type = rinst.GetType(ops[0].size);
             auto [reference, displacement] = GetMemOpReference(extra_flags[0], 2);
             reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(static_cast<uint64_t>(displacement)));
             p.StoreRegister(rinst, ops[0], p.CreateMemoryLoad(rinst, reference, type));
-            reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].isWord?4:8));
+            reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
             p.StoreRegister(rinst, ops[1], p.CreateMemoryLoad(rinst, reference, type));
         } break;
         case AArch64_INS_ALIAS_STP:
@@ -480,7 +480,7 @@ bool Lifter::InstructionLifter::Run() {
             auto [reference, displacement] = GetMemOpReference(extra_flags[0], 2);
             reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(static_cast<uint64_t>(displacement)));
             p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[0]));
-            reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].isWord?4:8));
+            reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
             p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[1]));
         } break;
         // Branch instructions

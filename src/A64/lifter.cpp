@@ -55,7 +55,7 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr, bool allow_nested) {
 
     // Check if nested
     const bool nested = top_instance != nullptr;
-    assert(!(nested && !allow_nested));
+    DYNAUTIC_ASSERT(!(nested && !allow_nested));
 
     // Set up context and module
     std::unique_ptr<LLVMContext> unique_context;
