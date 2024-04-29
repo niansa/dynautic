@@ -267,7 +267,7 @@ bool Lifter::InstructionLifter::Run() {
     // Handle conditional predicates (except CSEL)
     const RuntimeValues rt_values_backup = p.rt_values;
     BasicBlock *next_block = nullptr;
-    const bool conditional = detail.cc != AArch64CC_Invalid && insn.alias_id != AArch64_INS_CSEL;
+    const bool conditional = detail.cc != AArch64CC_Invalid && insn.id != AArch64_INS_CSEL;
     if (conditional) {
         Value *condition = GetCondition();
         if (!condition)
@@ -389,6 +389,8 @@ bool Lifter::InstructionLifter::Run() {
         case AArch64_INS_CSEL: {
             const auto ops = GetOps(3);
             Value *condition = GetCondition();
+            if (!condition)
+                break;
             p.StoreRegister(rinst, ops[0], rinst.builder->CreateSelect(condition, p.GetRegisterView(rinst, ops[1]), p.GetRegisterView(rinst, ops[2])));
         } break;
         // Arithmetic instructions

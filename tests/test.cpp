@@ -233,6 +233,18 @@ int main(int argc, char** argv) {
                       0xd65f03c0  // ret
                   }, unicorn.get());
 
+    dynautic->RunTest("Simple matching CSEL instruction", {
+                      0xf100001f, // cmp x0, #0
+                      0x9a8000e0, // csel x0, x7, x0, eq
+                      0xd65f03c0  // ret
+                  }, unicorn.get());
+
+    dynautic->RunTest("Simple non-matching CSEL instruction", {
+                      0xf100001f, // cmp x0, #0
+                      0x9a8010e0, // csel x0, x7, x0, ne
+                      0xd65f03c0  // ret
+                  }, unicorn.get());
+
     for (const auto& entry : std::filesystem::directory_iterator(TEST_BINS)) {
         if (!entry.is_regular_file())
             continue;
