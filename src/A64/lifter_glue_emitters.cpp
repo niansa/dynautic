@@ -6,6 +6,9 @@
 
 #include <optional>
 #include <vector>
+#ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
+#include <set>
+#endif
 #include <mutex>
 #include <algorithm>
 
@@ -101,9 +104,13 @@ void Lifter::CreateMemoryStore(Instance& rinst, llvm::Value *address, llvm::Valu
 }
 
 void Lifter::CreateCall(Instance& rinst, VAddr origin, llvm::Value *address, bool no_cache) {
+    CreateDebugPrintTrampoline(rinst, "Branching to (likely) non-constant offset");
+
     CreateLiftTrampoline(rinst, origin, address, no_cache);
 }
 void Lifter::CreateCall(Instance& rinst, VAddr origin, VAddr address) {
+    CreateDebugPrintTrampoline(rinst, "Branching to constant offset");
+
     // Use deferring lift if configured to
     if (!rt.conf.HasOptimization(OptimizationFlag::BlockLinking))
         return CreateCall(rinst, origin, rinst.builder->getInt64(address));
@@ -128,7 +135,9 @@ llvm::BasicBlock *Lifter::PrepareBranch(Instance& rinst, VAddr origin, Value *ad
     return block;
 }
 llvm::BasicBlock *Lifter::PrepareBranch(Instance& rinst, VAddr address) {
-    // Use dynamic branchif configured to
+    CreateDebugPrintTrampoline(rinst, "Preparing to branch... ");
+
+    // Use dynamic branch if block linking is disabled
     if (!rt.conf.HasOptimization(OptimizationFlag::BlockLinking))
         return PrepareBranch(rinst, rinst.pc, rinst.builder->getInt64(address));
 
@@ -265,5 +274,19 @@ void Lifter::CreateFreezeTrampoline(Instance& rinst) {
     rinst.builder->CreateCall(GetFreezeTrampoline(rinst), {runtime});
     rinst.builder->CreateRetVoid();
     rinst.block_terminated = true;
+}
+
+void Lifter::CreateDebugPrintTrampoline(Instance& rinst, const char *message) {
+#ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
+    static std::set<const char*> known_messages;
+    if (known_messages.empty())
+        outs() << "Runtime debug messages are enabled! To disable, undefine `ENABLE_RUNTIME_DEBUG_MESSAGES`.\n";
+    if (known_messages.count(message) == 0)
+        outs() << "Runtime debug message: Message \"" << message << "\" maps to " << reinterpret_cast<VAddr>(message) << '\n';
+    known_messages.emplace(message);
+    Value *msg = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(message)), rinst.builder->getPtrTy());
+
+    rinst.builder->CreateCall(GetDebugPrintTrampoline(rinst), {msg, rinst.builder->getInt64(rinst.pc)});
+#endif
 }
 }

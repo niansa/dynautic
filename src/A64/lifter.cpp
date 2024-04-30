@@ -94,8 +94,11 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr, bool allow_nested) {
     while (rinst.NextBranch()) {
         if (!rinst.IsDynamicBranch()) {
             // Lift leaf with known address
-            LiftLeaf(rinst, rinst.GetBranchAddr());
+            rinst.pc = rinst.GetBranchAddr();
+            CreateDebugPrintTrampoline(rinst, "Branch completed");
+            LiftLeaf(rinst, rinst.pc);
         } else {
+            CreateDebugPrintTrampoline(rinst, "Dynamic branch happening...");
             CreateLiftTrampolineBlock(rinst, rinst.GetBranchOrigin());
         }
     }

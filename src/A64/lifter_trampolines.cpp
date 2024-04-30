@@ -3,6 +3,7 @@
 #include "runtime.hpp"
 #include "../llvm.hpp"
 
+#include <iostream>
 #include <thread>
 
 
@@ -53,6 +54,12 @@ void FreezeTrampoline(Runtime::Impl& rt) {
         rt.UpdateExecutionState();
     }
 }
+
+#ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
+void DebugPrintTrampoline(const char *message, VAddr addr) {
+    std::cout << "Runtime debug message: " << message << " at 0x" << std::hex << addr << std::dec << std::endl;
+}
+#endif
 
 uint8_t MemoryRead8(Runtime::Impl& rt, VAddr addr) {
     return rt.conf.callbacks->MemoryRead8(addr);
@@ -136,7 +143,12 @@ void Lifter::SetupTrampolines(llvm::orc::LLJIT& jit) {
           llvm::JITSymbolFlags::Callable } },
         { jit.mangleAndIntern("FreezeTrampoline"),
          { llvm::orc::ExecutorAddr::fromPtr(&FreezeTrampoline),
+          llvm::JITSymbolFlags::Callable } },
+#ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
+        { jit.mangleAndIntern("DebugPrintTrampoline"),
+         { llvm::orc::ExecutorAddr::fromPtr(&DebugPrintTrampoline),
           llvm::JITSymbolFlags::Callable } }
+#endif
     })));
     DYNAUTIC_ASSERT(!error);
 }
@@ -223,4 +235,11 @@ llvm::FunctionCallee Lifter::GetFreezeTrampoline(Instance& rinst) {
     const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy()}, false);
     return rinst.module->getOrInsertFunction("FreezeTrampoline", ftype);
 }
+
+#ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
+llvm::FunctionCallee Lifter::GetDebugPrintTrampoline(Instance& rinst) {
+    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty()}, false);
+    return rinst.module->getOrInsertFunction("DebugPrintTrampoline", ftype);
+}
+#endif
 }

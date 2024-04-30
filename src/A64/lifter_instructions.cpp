@@ -291,6 +291,12 @@ bool Lifter::InstructionLifter::Run() {
     // Update PC
     rinst.pc = insn.address;
 
+    // Check alignment
+    DYNAUTIC_ASSERT((insn.address % 4) == 0);
+
+    // Debug message
+    p.CreateDebugPrintTrampoline(rinst, "Executing instruction");
+
     // Handle conditional predicates (except CSEL)
     BasicBlock *next_block = nullptr;
     const bool conditional = detail.cc != AArch64CC_Invalid && insn.id != AArch64_INS_CSEL;
@@ -304,6 +310,7 @@ bool Lifter::InstructionLifter::Run() {
         p.CreateRegisterSave(rinst);
         rinst.builder->CreateCondBr(condition, true_block, next_block);
         rinst.UseBasicBlock(true_block);
+        p.CreateDebugPrintTrampoline(rinst, "Taking `true` branch in conditional predicate");
     }
 
     // Handle instruction
@@ -570,6 +577,7 @@ bool Lifter::InstructionLifter::Run() {
             DYNAUTIC_ASSERT(op.type == AArch64_OP_IMM);
             if (static_cast<VAddr>(op.imm) == insn.address) {
                 // Stall forever since this is definitely an infinite loop
+                p.CreateDebugPrintTrampoline(rinst, "Infinite loop detected");
                 p.CreateFreezeTrampoline(rinst);
                 return;
             } else if (static_cast<VAddr>(op.imm) == insn.address+4) {

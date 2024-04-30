@@ -123,6 +123,7 @@ class Lifter {
     void CreateSvcTrampoline(Instance&, uint32_t swi);
     void CreateExceptionTrampoline(Instance&, Exception);
     void CreateFreezeTrampoline(Instance&);
+    void CreateDebugPrintTrampoline(Instance&, const char *message);
 
     static llvm::FunctionCallee GetMemoryRead(Instance&, uint8_t bits);
     static llvm::FunctionCallee GetMemoryWrite(Instance&, uint8_t bits);
@@ -132,6 +133,9 @@ class Lifter {
     static llvm::FunctionCallee GetUpdateExecutionStateTrampoline(Instance&);
     static llvm::FunctionCallee GetCreateDynamicBranchEntryTrampoline(Instance&);
     static llvm::FunctionCallee GetFreezeTrampoline(Instance&);
+#ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
+    static llvm::FunctionCallee GetDebugPrintTrampoline(Instance&);
+#endif
 
     void LiftLeaf(Instance&, VAddr addr);
     bool LiftInstruction(Instance&, const cs_insn&, const std::vector<VAddr>& noexec_addrs = {});

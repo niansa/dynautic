@@ -26,12 +26,7 @@ bool Lifter::Instance::NextBranch() {
     branch = queued_branches.front();
     queued_branches.pop();
 
-    if (!builder.has_value())
-        builder.emplace(branch->basic_block);
-    else
-        builder->SetInsertPoint(branch->basic_block);
-
-    block_terminated = false;
+    UseBasicBlock(branch->basic_block);
     return true;
 }
 

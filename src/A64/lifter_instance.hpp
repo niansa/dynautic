@@ -21,6 +21,7 @@ private:
         llvm::BasicBlock *basic_block;
         bool dynamic = false;
         VAddr addr, origin;
+        llvm::BasicBlock *current_basic_block;
 
         Branch(Lifter::Instance& parent, const llvm::Twine& name) {
             basic_block = llvm::BasicBlock::Create(*parent.context, name, parent.func);
@@ -40,11 +41,12 @@ private:
     Branch *branch;
     std::queue<Branch*> queued_branches;
     std::vector<std::unique_ptr<Branch>> branches;
+    llvm::BasicBlock *current_basic_block;
 
 public:
     std::optional<llvm::IRBuilder<>> builder;
     bool block_terminated;
-    VAddr pc;
+    VAddr pc = 0xbad0bad0bad0bad0;
 
     Instance(Runtime::Impl& runtime, llvm::LLVMContext *context, llvm::Module *module, const llvm::Twine& function_name);
 
@@ -52,8 +54,11 @@ public:
         return llvm::BasicBlock::Create(*context, name, func);
     }
     void UseBasicBlock(llvm::BasicBlock *basic_block) {
-        branch->basic_block = basic_block;
-        builder->SetInsertPoint(basic_block);
+        current_basic_block = basic_block;
+        if (!builder.has_value())
+            builder.emplace(basic_block);
+        else
+            builder->SetInsertPoint(current_basic_block);
         block_terminated = false; // Assume new block hasn't been terminated yet
     }
 

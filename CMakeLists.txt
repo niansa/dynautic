@@ -44,6 +44,7 @@ if (CMAKE_BUILD_TYPE STREQUAL Debug)
     target_compile_definitions(dynautic PRIVATE ENABLE_LLVM_VALIDATION)
     target_compile_definitions(dynautic PRIVATE ENABLE_ASSERTS)
     target_compile_definitions(dynautic PRIVATE ENABLE_DEBUGGER_SUPPORT)
+    #target_compile_definitions(dynautic PRIVATE ENABLE_RUNTIME_DEBUG_MESSAGES)
 endif()
 
 install(TARGETS dynautic
