@@ -298,6 +298,7 @@ bool Lifter::InstructionLifter::Run() {
     p.CreateDebugPrintTrampoline(rinst, "Executing instruction");
 
     // Handle conditional predicates (except CSEL)
+    RuntimeValues rt_values_backup;
     BasicBlock *next_block = nullptr;
     const bool conditional = detail.cc != AArch64CC_Invalid && insn.id != AArch64_INS_CSEL;
     if (conditional) {
@@ -307,7 +308,7 @@ bool Lifter::InstructionLifter::Run() {
         // Create branch
         BasicBlock *true_block = rinst.CreateBasicBlock("ConditionalPredTrue");
         next_block = rinst.CreateBasicBlock("ConditionalPredEnd");
-        p.CreateRegisterSave(rinst);
+        rt_values_backup = p.rt_values;
         rinst.builder->CreateCondBr(condition, true_block, next_block);
         rinst.UseBasicBlock(true_block);
         p.CreateDebugPrintTrampoline(rinst, "Taking `true` branch in conditional predicate");
@@ -661,7 +662,7 @@ bool Lifter::InstructionLifter::Run() {
             rinst.builder->CreateBr(next_block);
         }
         rinst.UseBasicBlock(next_block);
-        p.CreateRegisterRestore(rinst);
+        p.rt_values = rt_values_backup;
     }
 
     return !rinst.block_terminated;
