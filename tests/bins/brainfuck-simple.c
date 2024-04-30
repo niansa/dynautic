@@ -1,0 +1,47 @@
+typedef unsigned char byte;
+
+void interpret(const char *code, unsigned long *result);
+
+__attribute__((section(".start")))
+unsigned long _start() {
+    const char code[] = "++++++++++[>+>+++>+++++++>++++++++++<<<<-]>>>++.>+.+++++++..+++.<<++.>+++++++++++++++.>.+++.------.--------.<<+.<.";
+    unsigned long fres = 0;
+    interpret(code, &fres);
+    return fres;
+}
+
+void zmem(byte *memory, unsigned length) {
+    for (unsigned idx = 0; idx != length; ++idx)
+        memory[idx] = 0;
+}
+
+void procchar(char c, unsigned long *result) {
+    *result ^= (*result << 10);
+    *result ^= (*result >> 18);
+    *result ^= (*result << 2);
+    *result += c;
+}
+
+void interpret(const char *code, unsigned long *result) {
+    byte memory[10240];
+    zmem(memory, 10240);
+    byte *ptr = memory;
+    const char *stack[1024];
+    const char **stack_ptr = stack;
+    for (const char *instruction = code; *instruction; ++instruction) {
+        switch (*instruction) {
+        case '<': --ptr; break;
+        case '>': ++ptr; break;
+        case '+': ++*ptr; break;
+        case '-': --*ptr; break;
+        case '.': procchar((char)*ptr, result); break;
+        case '[': *(stack_ptr++) = instruction; break;
+        case ']': {
+            if (*ptr == 0)
+                --stack_ptr;
+            else
+                instruction = *(stack_ptr-1);
+        } break;
+        }
+    }
+}

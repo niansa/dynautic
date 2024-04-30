@@ -580,11 +580,12 @@ bool Lifter::InstructionLifter::Run() {
                 p.CreateDebugPrintTrampoline(rinst, "Infinite loop detected");
                 p.CreateFreezeTrampoline(rinst);
                 return;
-            } else if (static_cast<VAddr>(op.imm) == insn.address+4) {
-                // Do nothing since this is essentially a no-op
-                return;
             }
             p.StoreRegister(rinst, "x30", rinst.builder->getInt64(insn.address+4));
+            if (static_cast<VAddr>(op.imm) == insn.address+4) {
+                // Don't call since target address is next instruction
+                return;
+            }
             CreateCall(0);
         } return;
         case AArch64_INS_BR:

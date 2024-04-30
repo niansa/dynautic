@@ -30,9 +30,9 @@ public:
         std::cout << "Running test: " << test_name << "..." << std::endl;
         const auto result = RunTest(std::move(instructions), memory);
         if (result != expected_result)
-            std::cerr << std::hex << "Test failed! Result: 0x" << result << " (expected 0x" << expected_result << ")!\n" << std::endl;
+            std::cerr << std::hex << "Test failed! Function result: 0x" << result << " (expected 0x" << expected_result << ")!\n" << std::endl;
         else
-            std::cout << std::hex << "Test successful (0x" << result << ").\n" << std::endl;
+            std::cout << std::hex << "Function result matches (0x" << result << ").\n" << std::endl;
     }
 
     void RunTest(std::string_view test_name, std::vector<u32>&& instructions, TestBase *validator) {

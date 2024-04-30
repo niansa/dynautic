@@ -36,6 +36,7 @@ public:
                   x2 = 0x0,
                   x10 = heap_base,
                   x23 = exit_addr,
+                  x24 = exe_base,
                   x30 = exit_addr,
                   PC = exe_base,
                   SP = stack_addr;
@@ -44,6 +45,7 @@ public:
         uc_reg_write(uc, UC_ARM64_REG_X2, &x2);
         uc_reg_write(uc, UC_ARM64_REG_X10, &x10);
         uc_reg_write(uc, UC_ARM64_REG_X23, &x23);
+        uc_reg_write(uc, UC_ARM64_REG_X24, &x24);
         uc_reg_write(uc, UC_ARM64_REG_X30, &x30);
         uc_reg_write(uc, UC_ARM64_REG_SP, &SP);
 

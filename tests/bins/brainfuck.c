@@ -10,12 +10,6 @@ unsigned long _start() {
     return fres;
 }
 
-void *memcpy(void *dest, const void *src, unsigned long n) {
-    for (unsigned long it = 0; it != n; it++)
-        ((char*)dest)[it] = ((char*)src)[it];
-    return dest;
-}
-
 void zmem(byte *memory, unsigned length) {
     for (unsigned idx = 0; idx != length; ++idx)
         memory[idx] = 0;

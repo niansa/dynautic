@@ -122,7 +122,7 @@ class TestDynautic final : public TestBase {
 public:
     TestDynautic() {
         user_config.callbacks = &env;
-        user_config.check_halt_on_memory_access = true;
+        user_config.check_halt_on_memory_access = false;
     }
 
     uint64_t RunTest(std::vector<u32>&& instructions, std::array<u8, TestBase::mem_size>& memory) override {
@@ -159,6 +159,7 @@ public:
             cpu.SetRegister(2, 0x0);
             cpu.SetRegister(10, heap_base);
             cpu.SetRegister(23, exit_addr);
+            cpu.SetRegister(24, exe_base);
             cpu.SetRegister(30, exit_addr);
             cpu.SetSP(stack_addr);
             cpu.SetPC(exe_base);

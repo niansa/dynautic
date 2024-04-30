@@ -257,6 +257,11 @@ int main(int argc, char** argv) {
                       0xd65f03c0  // ret
                   }, unicorn.get());
 
+    dynautic->RunTest("Simple LDRB instruction using immediate", {
+                      0x39400300, // ldrb w0, [x24]
+                      0xd65f03c0  // ret
+                  }, unicorn.get());
+
     for (const auto& entry : std::filesystem::directory_iterator(TEST_BINS)) {
         if (!entry.is_regular_file())
             continue;
