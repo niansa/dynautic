@@ -24,13 +24,13 @@ void Lifter::CreateRegisterRestore(Instance& rinst) {
 
     // Fill in general purpose registers
     for (unsigned idx = 0; idx != rt_values.registers.size(); ++idx) {
-        rt_values.registers[idx] = CreateLoadFromPtr(rinst, &rt.registers[idx], rinst.builder->getInt64Ty(), "r"+std::to_string(idx)+'_');
+        rt_values.registers[idx] = CreateLoadFromPtr(rinst, &rt.registers[idx], rinst.builder->getInt64Ty(), "x"+std::to_string(idx)+'_');
     }
     rt_values.dirty_registers.fill(false);
 
     // Fill in vector registers
     for (unsigned idx = 0; idx != rt_values.vectors.size(); ++idx) {
-        rt_values.vectors[idx] = CreateLoadFromPtr(rinst, &rt.vectors[idx], rinst.builder->getInt128Ty(), "d"+std::to_string(idx)+'_');
+        rt_values.vectors[idx] = CreateLoadFromPtr(rinst, &rt.vectors[idx], rinst.builder->getInt128Ty(), "q"+std::to_string(idx)+'_');
     }
     rt_values.dirty_vectors.fill(false);
 
