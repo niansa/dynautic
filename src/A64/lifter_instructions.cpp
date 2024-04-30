@@ -95,7 +95,7 @@ std::array<RegisterDescription, Lifter::InstructionLifter::GetOps_max_op_count> 
 }
 
 Value *Lifter::InstructionLifter::GetCondition() {
-    Value *condition;
+    Value *condition = nullptr;
     auto [left, right] = p.rt_values.comparison;
     if (!left || !right) {
         DYNAUTIC_ASSERT(!"Unknown comparison values");
@@ -610,7 +610,7 @@ bool Lifter::InstructionLifter::Run() {
             const auto dest = GetOps(1)[0];
             const auto src = detail.operands[1];
             DYNAUTIC_ASSERT(src.type == AArch64_OP_REG_MRS);
-            Value *value;
+            Value *value = nullptr;
             switch (src.sysop.reg.sysreg) {
             case AArch64_SYSREG_CNTFRQ_EL0: value = rinst.builder->getInt32(rinst.rt.conf.cntfrq_el0); break;
             case AArch64_SYSREG_CTR_EL0: value = rinst.builder->getInt32(rinst.rt.conf.ctr_el0); break;

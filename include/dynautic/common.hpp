@@ -13,7 +13,7 @@
 #include <cassert>
 #define DYNAUTIC_ASSERT(...) assert(__VA_ARGS__)
 #else
-#define DYNAUTIC_ASSERT(...) do {__VA_ARGS__;} while (0)
+#define DYNAUTIC_ASSERT(...) (void)(__VA_ARGS__)
 #endif
 #endif
 

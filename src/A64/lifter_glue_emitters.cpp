@@ -287,6 +287,9 @@ void Lifter::CreateDebugPrintTrampoline(Instance& rinst, const char *message) {
     Value *msg = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(message)), rinst.builder->getPtrTy());
 
     rinst.builder->CreateCall(GetDebugPrintTrampoline(rinst), {msg, rinst.builder->getInt64(rinst.pc)});
+#else
+    (void)rinst;
+    (void)message;
 #endif
 }
 }
