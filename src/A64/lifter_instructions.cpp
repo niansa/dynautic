@@ -268,12 +268,12 @@ void Lifter::InstructionLifter::DeferCompilation(bool repeat_instruction) {
 #define Handle3Ops(func) \
     do { \
         auto ops = GetOps(3); \
-        p.StoreRegister(rinst, ops[0], func(p.GetRegisterView(rinst, ops[1]), p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift))); \
+        p.StoreRegister(rinst, ops[0], func(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift), rinst.GetType(ops[1].size), false))); \
     } while (0)
 #define Handle3OpsNot(func) \
     do { \
         auto ops = GetOps(3); \
-        p.StoreRegister(rinst, ops[0], func(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateNot(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift)))); \
+p.StoreRegister(rinst, ops[0], func(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateNot(rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift), rinst.GetType(ops[1].size), false)))); \
     } while (0)
 
 #define HandleShift(type) \
