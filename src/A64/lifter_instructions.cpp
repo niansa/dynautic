@@ -292,7 +292,6 @@ bool Lifter::InstructionLifter::Run() {
     rinst.pc = insn.address;
 
     // Handle conditional predicates (except CSEL)
-    const RuntimeValues rt_values_backup = p.rt_values;
     BasicBlock *next_block = nullptr;
     const bool conditional = detail.cc != AArch64CC_Invalid && insn.id != AArch64_INS_CSEL;
     if (conditional) {
@@ -302,6 +301,7 @@ bool Lifter::InstructionLifter::Run() {
         // Create branch
         BasicBlock *true_block = rinst.CreateBasicBlock("ConditionalPredTrue");
         next_block = rinst.CreateBasicBlock("ConditionalPredEnd");
+        p.CreateRegisterSave(rinst);
         rinst.builder->CreateCondBr(condition, true_block, next_block);
         rinst.UseBasicBlock(true_block);
     }
@@ -572,6 +572,9 @@ bool Lifter::InstructionLifter::Run() {
                 // Stall forever since this is definitely an infinite loop
                 p.CreateFreezeTrampoline(rinst);
                 return;
+            } else if (static_cast<VAddr>(op.imm) == insn.address+4) {
+                // Do nothing since this is essentially a no-op
+                return;
             }
             p.StoreRegister(rinst, "x30", rinst.builder->getInt64(insn.address+4));
             CreateCall(0);
@@ -649,7 +652,7 @@ bool Lifter::InstructionLifter::Run() {
             rinst.builder->CreateBr(next_block);
         }
         rinst.UseBasicBlock(next_block);
-        p.rt_values = rt_values_backup;
+        p.CreateRegisterRestore(rinst);
     }
 
     return !rinst.block_terminated;

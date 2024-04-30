@@ -113,7 +113,9 @@ void Lifter::CreateCall(Instance& rinst, VAddr origin, VAddr address) {
     // Try to lift given instruction
     LiftNested(address);
     // Call into lifted address
-    rinst.builder->CreateCall(Lifter::GetLiftedFunction(rinst, address))->setTailCall();
+    CallInst *call = rinst.builder->CreateCall(Lifter::GetLiftedFunction(rinst, address));
+    call->setTailCall();
+    call->setCallingConv(CallingConv::Tail);
     rinst.builder->CreateRetVoid();
     rinst.block_terminated = true;
 }
@@ -208,8 +210,11 @@ void Lifter::CreateLiftTrampolineBlock(Instance& rinst, VAddr origin, bool no_ca
 
     Value *self = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(this)), rinst.builder->getPtrTy());
 
-    if (!rt.conf.fully_static)
-        rinst.builder->CreateCall(GetLiftTrampoline(rinst), {self, address})->setTailCall();
+    if (!rt.conf.fully_static) {
+        CallInst *call = rinst.builder->CreateCall(GetLiftTrampoline(rinst), {self, address});
+        call->setTailCall();
+        call->setCallingConv(CallingConv::Tail);
+    }
     rinst.builder->CreateRetVoid();
     rinst.block_terminated = true;
 }
@@ -225,8 +230,11 @@ void Lifter::CreateLiftTrampoline(Instance& rinst, VAddr origin, Value *addr, bo
 
     Value *self = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(this)), rinst.builder->getPtrTy());
 
-    if (!rt.conf.fully_static)
-        rinst.builder->CreateCall(GetLiftTrampoline(rinst), {self, addr})->setTailCall();
+    if (!rt.conf.fully_static) {
+        CallInst *call = rinst.builder->CreateCall(GetLiftTrampoline(rinst), {self, addr});
+        call->setTailCall();
+        call->setCallingConv(CallingConv::Tail);
+    }
     rinst.builder->CreateRetVoid();
     rinst.block_terminated = true;
 }
