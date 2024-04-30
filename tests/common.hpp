@@ -1,5 +1,7 @@
 #ifndef COMMON_HPP
 #define COMMON_HPP
+#include "timer.hpp"
+
 #include <iostream>
 #include <string_view>
 #include <array>

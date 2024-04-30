@@ -166,7 +166,9 @@ public:
 
             // Execute
             restart:
+            common::Timer timer;
             const auto halt_reason = cpu.Run();
+            const auto duration = timer.get();
             switch (halt_reason) {
             case Dynautic::HaltReason::UserDefined4: break;
             case Dynautic::HaltReason::UserDefined3: cpu.SetPC(cpu.GetPC()+4); goto restart;
@@ -184,7 +186,7 @@ public:
                 fres = 0xcac3bad;
             memory = env.memory;
 
-            std::cout << "Dynautic pass #" << run << " done!" << std::endl;
+            std::cout << "Dynautic pass #" << std::dec << run << " done after " << duration << "ms!" << std::endl;
         }
 
         std::cout << "Dynautic done!" << std::endl;

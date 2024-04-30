@@ -50,7 +50,9 @@ public:
         uc_reg_write(uc, UC_ARM64_REG_SP, &SP);
 
         // Execute
+        common::Timer timer;
         const uc_err execution_error = uc_emu_start(uc, exe_base, exit_addr, 0, 0);
+        const auto duration = timer.get();
         if (execution_error)
             std::cerr << "Unicorn execution error: " << uc_strerror(execution_error) << std::endl;
 
@@ -58,7 +60,7 @@ public:
         u64 result;
         uc_reg_read(uc, UC_ARM64_REG_X0, &result);
         handle_error(uc_mem_read(uc, 0x0, memory.data(), memory.size()));
-        std::cout << "Unicorn done!" << std::endl;
+        std::cout << "Unicorn done after " << std::dec << duration << "ms!" << std::endl;
         return result;
     }
 };
