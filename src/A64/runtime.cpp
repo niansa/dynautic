@@ -4,8 +4,10 @@
 #include "runtime.hpp"
 #include "../llvm.hpp"
 
+#include <iostream>
 #include <memory>
 #include <dynautic/A64.hpp>
+#include <llvm/ExecutionEngine/Orc/TargetProcess/RegisterEHFrames.h>
 
 
 
@@ -76,14 +78,19 @@ Runtime::Impl::Impl(UserConfig conf_, Runtime *parent)
 }
 
 void Runtime::Impl::CreateJit() {
-    // Create LLJIT builder
-    auto expected_jit = llvm::orc::LLJITBuilder().create();
-    if (expected_jit) {
-        jit = std::move(expected_jit.get());
-        Lifter::SetupTrampolines(*jit);
-    } else {
+    auto expected_jit = llvm::orc::LLJITBuilder()
+#ifdef ENABLE_DEBUGGER_SUPPORT
+                            .setEnableDebuggerSupport(true)
+#endif
+                            .create();
+    if (!expected_jit) {
         jit = nullptr;
+        llvm::errs() << "Failed to initialize JIT: " << expected_jit.takeError() << '\n';
+        return;
     }
+
+    jit = std::move(expected_jit.get());
+    Lifter::SetupTrampolines(*jit);
 }
 
 void Runtime::Impl::UpdateExecutionState() {

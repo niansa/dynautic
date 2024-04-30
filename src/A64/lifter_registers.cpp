@@ -50,7 +50,17 @@ std::string RegisterDescription::GetName() const {
     // Get prefix
     switch (type) {
     case Type::general: {
-        fres.push_back((size==Size::word)?'w':'x');
+        switch (size) {
+        case word: fres.push_back('w'); break;
+        case double_word: fres.push_back('x'); break;
+        }
+    } break;
+    case Type::vector: {
+        switch (size) {
+        case single: fres.push_back('s'); break;
+        case double_: fres.push_back('d'); break;
+        case quad: fres.push_back('q'); break;
+        }
     } break;
     case Type::scratch: {
         fres.append((size==Size::word)?"scratch32_":"scratch64_");

@@ -41,7 +41,7 @@ FunctionCallee Lifter::GetLiftedFunction(Instance& rinst, VAddr addr) {
 }
 
 std::optional<ExecutorAddr> Lifter::Lift(VAddr addr, bool allow_nested) {
-    DYNAUTIC_ASSERT(IsOk());
+    DYNAUTIC_ASSERT(IsOk() && rt.jit);
 
     if (IsLiftPending(addr))
         return {};

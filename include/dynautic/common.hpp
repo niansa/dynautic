@@ -9,7 +9,7 @@
 #include <cstdint>
 
 #ifndef DYNAUTIC_ASSERT
-#ifndef NDEBUG
+#ifdef ENABLE_ASSERTS
 #include <cassert>
 #define DYNAUTIC_ASSERT(...) assert(__VA_ARGS__)
 #else

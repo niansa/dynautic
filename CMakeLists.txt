@@ -5,7 +5,7 @@ project(dynautic LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(LLVM REQUIRED)
+find_package(LLVM 17 REQUIRED)
 separate_arguments(LLVM_DEFINITIONS)
 
 include(cppharden/harden.cmake)
@@ -35,13 +35,15 @@ target_include_directories(dynautic PRIVATE ${LLVM_INCLUDE_DIRS} PUBLIC include)
 target_compile_definitions(dynautic PRIVATE ${LLVM_DEFINITIONS})
 target_link_libraries(dynautic PRIVATE capstone)
 target_precompile_headers(dynautic PRIVATE src/llvm.hpp)
-target_compile_options(dynautic PRIVATE -fno-exceptions)
-llvm_config(dynautic core executionengine orcjit nativecodegen)
+target_compile_options(dynautic PRIVATE -fno-exceptions -funwind-tables)
+llvm_config(dynautic USE_SHARED core executionengine orcjit nativecodegen)
 target_hardening(dynautic)
 target_compile_options(dynautic PRIVATE -Wno-error=cast-qual -Wno-error=implicit-fallthrough -Wno-string-conversion -Wno-sign-conversion)
 
 if (CMAKE_BUILD_TYPE STREQUAL Debug)
     target_compile_definitions(dynautic PRIVATE ENABLE_LLVM_VALIDATION)
+    target_compile_definitions(dynautic PRIVATE ENABLE_ASSERTS)
+    target_compile_definitions(dynautic PRIVATE ENABLE_DEBUGGER_SUPPORT)
 endif()
 
 install(TARGETS dynautic
