@@ -41,10 +41,12 @@ target_hardening(dynautic)
 target_compile_options(dynautic PRIVATE -Wno-error=cast-qual -Wno-error=implicit-fallthrough -Wno-string-conversion -Wno-sign-conversion)
 
 if (CMAKE_BUILD_TYPE STREQUAL Debug)
-    target_compile_definitions(dynautic PRIVATE ENABLE_LLVM_VALIDATION)
-    target_compile_definitions(dynautic PRIVATE ENABLE_ASSERTS)
-    target_compile_definitions(dynautic PRIVATE ENABLE_DEBUGGER_SUPPORT)
-    #target_compile_definitions(dynautic PRIVATE ENABLE_RUNTIME_DEBUG_MESSAGES)
+    target_compile_definitions(dynautic PRIVATE
+        ENABLE_LLVM_VALIDATION
+        ENABLE_ASSERTS
+        ENABLE_DEBUGGER_SUPPORT
+        #ENABLE_RUNTIME_DEBUG_MESSAGES
+    )
 endif()
 
 install(TARGETS dynautic
