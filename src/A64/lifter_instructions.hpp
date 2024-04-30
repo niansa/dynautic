@@ -19,7 +19,7 @@ class Lifter::InstructionLifter {
     const cs_insn& insn;
     const cs_aarch64& detail;
 
-    std::array<bool, 4> extra_flags{};
+    std::array<bool, 6> extra_flags{};
 
     uint8_t shift = 0;
     aarch64_shifter shift_type = AArch64_SFT_INVALID;
@@ -36,6 +36,15 @@ class Lifter::InstructionLifter {
     llvm::BasicBlock *PrepareBranch(unsigned op_idx = 0);
 
     std::pair<llvm::Value *, int32_t> GetMemOpReference(bool unscaled, unsigned op_idx = 1);
+
+    enum LoadStoreFlags {
+        unscaled,
+        signed_,
+        byte,
+        half,
+        word
+    };
+    uint8_t GetLoadStoreFlagsAndSize(uint64_t insn_id);
 
     void DeferCompilation(bool repeat_instruction = false);
 

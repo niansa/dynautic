@@ -25,7 +25,8 @@ RegisterDescription::RegisterDescription(const char *name) {
     }
 
     switch (type) {
-    case Type::general: {
+    case Type::general:
+    case Type::vector: {
         // Remove letter
         ++name;
         // Check for zr

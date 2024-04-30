@@ -245,6 +245,18 @@ int main(int argc, char** argv) {
                       0xd65f03c0  // ret
                   }, unicorn.get());
 
+    dynautic->RunTest("Simple ADR instruction using immediate", {
+                      0xd503201f, // nop
+                      0x10000020, // adr x0, 4
+                      0xd65f03c0  // ret
+                  }, unicorn.get());
+
+    dynautic->RunTest("Simple ADRP instruction using immediate", {
+                      0xd503201f, // nop
+                      0x90000000, // adrp x0, 4
+                      0xd65f03c0  // ret
+                  }, unicorn.get());
+
     for (const auto& entry : std::filesystem::directory_iterator(TEST_BINS)) {
         if (!entry.is_regular_file())
             continue;

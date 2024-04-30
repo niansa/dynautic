@@ -223,6 +223,33 @@ std::pair<Value *, int32_t> Lifter::InstructionLifter::GetMemOpReference(bool un
     return {reference, detail.post_index?0:displacement};
 }
 
+uint8_t Lifter::InstructionLifter::GetLoadStoreFlagsAndSize(uint64_t insn_id) {
+    //TODO: Validate if behavior is correct
+    switch (insn_id) {
+    case AArch64_INS_ALIAS_STURB:
+    case AArch64_INS_ALIAS_LDURB: extra_flags[unscaled] = extra_flags[byte] = true; break;
+    case AArch64_INS_ALIAS_STURH:
+    case AArch64_INS_ALIAS_LDURH: extra_flags[unscaled] = extra_flags[half] = true; break;
+    case AArch64_INS_ALIAS_LDURSB: extra_flags[unscaled] = extra_flags[signed_] = extra_flags[byte] = true; break;
+    case AArch64_INS_ALIAS_LDURSH: extra_flags[unscaled] = extra_flags[signed_] = extra_flags[half] = true; break;
+    case AArch64_INS_ALIAS_LDURSW: extra_flags[unscaled] = extra_flags[signed_] = extra_flags[word] = true; break;
+    case AArch64_INS_ALIAS_STUR:
+    case AArch64_INS_STUR:
+    case AArch64_INS_ALIAS_LDUR:
+    case AArch64_INS_LDUR: extra_flags[unscaled] = true; break;
+    case AArch64_INS_ALIAS_STRB:
+    case AArch64_INS_STRB:
+    case AArch64_INS_ALIAS_LDRB:
+    case AArch64_INS_LDRB: extra_flags[byte] = true; break;
+    case AArch64_INS_ALIAS_STR:
+    case AArch64_INS_STR:
+    case AArch64_INS_ALIAS_LDR:
+    case AArch64_INS_LDR: break;
+    }
+
+    return extra_flags[byte]?8:extra_flags[half]?16:extra_flags[word]?32:0;
+}
+
 void Lifter::InstructionLifter::DeferCompilation(bool repeat_instruction) {
     // Below function terminates the block
     p.CreateLiftTrampoline(rinst, insn.address, rinst.builder->getInt64(insn.address+(repeat_instruction?0:4)));
@@ -446,30 +473,75 @@ bool Lifter::InstructionLifter::Run() {
             p.rt_values.comparison.first = p.GetRegisterView(rinst, ops[0]);
             p.rt_values.comparison.second = p.GetRegisterView(rinst, ops[1]);
             p.rt_values.dirty_comparison = true;
-        }; break;
+        } break;
+        case AArch64_INS_ADR: {
+            const auto ops = GetOps(2);
+            p.StoreRegister(rinst, ops[0], p.GetRegisterView(rinst, ops[1]));
+        } break;
+        case AArch64_INS_ADRP: {
+            const auto ops = GetOps(2);
+            p.StoreRegister(rinst, ops[0], p.GetRegisterView(rinst, ops[1]));
+        } break;
         // Load and store instructions
+        case AArch64_INS_ALIAS_LDURB:
+        case AArch64_INS_ALIAS_LDURH:
+        case AArch64_INS_ALIAS_LDURSB:
+        case AArch64_INS_ALIAS_LDURSH:
+        case AArch64_INS_ALIAS_LDURSW:
         case AArch64_INS_ALIAS_LDUR:
-        case AArch64_INS_LDUR: extra_flags[0] = true; [[fallthrough]];
+        case AArch64_INS_LDUR:
+        case AArch64_INS_ALIAS_LDRB:
+        case AArch64_INS_LDRB:
         case AArch64_INS_ALIAS_LDR:
         case AArch64_INS_LDR: {
+            const uint8_t msiz = GetLoadStoreFlagsAndSize(id);
+
             const auto op = GetOps(1)[0];
             auto [reference, displacement] = GetMemOpReference(extra_flags[0]);
-            p.StoreRegister(rinst, op, p.CreateMemoryLoad(rinst, rinst.builder->CreateAdd(reference, rinst.builder->getInt64(static_cast<uint64_t>(displacement))), rinst.GetType(op.size)));
+            if (displacement)
+                reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(static_cast<uint64_t>(displacement)));
+            Value *value = p.CreateMemoryLoad(rinst, reference, rinst.GetType(msiz?msiz:op.size));
+            if (msiz)
+                value = rinst.builder->CreateIntCast(value, rinst.GetType(op.size), extra_flags[signed_]);
+            p.StoreRegister(rinst, op, value);
         } break;
+        case AArch64_INS_ALIAS_STURB:
+        case AArch64_INS_ALIAS_STURH:
         case AArch64_INS_ALIAS_STUR:
-        case AArch64_INS_STUR: extra_flags[0] = true; [[fallthrough]];
+        case AArch64_INS_STUR:
+        case AArch64_INS_ALIAS_STRB:
+        case AArch64_INS_STRB:
         case AArch64_INS_ALIAS_STR:
         case AArch64_INS_STR: {
+            const uint8_t msiz = GetLoadStoreFlagsAndSize(id);
+
             const auto op = GetOps(1)[0];
             auto [reference, displacement] = GetMemOpReference(extra_flags[0]);
-            p.CreateMemoryStore(rinst, rinst.builder->CreateAdd(reference, rinst.builder->getInt64(static_cast<uint64_t>(displacement))), p.GetRegisterView(rinst, op));
+            Value *value = p.GetRegisterView(rinst, op);
+            if (msiz)
+                value = rinst.builder->CreateIntCast(value, rinst.GetType(msiz), extra_flags[signed_]);
+            if (displacement)
+                reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(static_cast<uint64_t>(displacement)));
+            p.CreateMemoryStore(rinst, reference, value);
+        } break;
+        case AArch64_INS_ALIAS_LDPSW:
+        case AArch64_INS_LDPSW: {
+            const auto ops = GetOps(2);
+            Type *type = rinst.GetType(ops[0].size);
+            auto [reference, displacement] = GetMemOpReference(false, 2);
+            if (displacement)
+                reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(static_cast<uint64_t>(displacement)));
+            p.StoreRegister(rinst, ops[0], rinst.builder->CreateIntCast(p.CreateMemoryLoad(rinst, reference, rinst.builder->getInt32Ty()), type, true));
+            reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
+            p.StoreRegister(rinst, ops[1], rinst.builder->CreateIntCast(p.CreateMemoryLoad(rinst, reference, rinst.builder->getInt32Ty()), type, true));
         } break;
         case AArch64_INS_ALIAS_LDP:
         case AArch64_INS_LDP: {
             const auto ops = GetOps(2);
             Type *type = rinst.GetType(ops[0].size);
-            auto [reference, displacement] = GetMemOpReference(extra_flags[0], 2);
-            reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(static_cast<uint64_t>(displacement)));
+            auto [reference, displacement] = GetMemOpReference(false, 2);
+            if (displacement)
+                reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(static_cast<uint64_t>(displacement)));
             p.StoreRegister(rinst, ops[0], p.CreateMemoryLoad(rinst, reference, type));
             reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
             p.StoreRegister(rinst, ops[1], p.CreateMemoryLoad(rinst, reference, type));
@@ -477,8 +549,9 @@ bool Lifter::InstructionLifter::Run() {
         case AArch64_INS_ALIAS_STP:
         case AArch64_INS_STP: {
             const auto ops = GetOps(2);
-            auto [reference, displacement] = GetMemOpReference(extra_flags[0], 2);
-            reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(static_cast<uint64_t>(displacement)));
+            auto [reference, displacement] = GetMemOpReference(false, 2);
+            if (displacement)
+                reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(static_cast<uint64_t>(displacement)));
             p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[0]));
             reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
             p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[1]));
@@ -561,7 +634,7 @@ bool Lifter::InstructionLifter::Run() {
         } break;
         case AArch64_INS_UDF:
         default: {
-            // Bad instruction, check if noexec address
+            // Bad/unknown instruction, check if noexec address
             const bool noexec = std::find(noexec_addrs.begin(), noexec_addrs.end(), insn.address) != noexec_addrs.end();
             p.CreateExceptionTrampoline(rinst, noexec?Exception::NoExecuteFault:Exception::UnallocatedEncoding);
             return;
