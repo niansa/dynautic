@@ -108,11 +108,7 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr, bool allow_nested) {
     if (!nested) {
         top_instance = nullptr;
 
-        // Dump generated IR if enabled
-        if (rt.conf.dump_assembly)
-            outs() << *module;
-
-        #ifdef ENABLE_LLVM_VALIDATION
+#ifdef ENABLE_LLVM_VALIDATION
         // Run verifier
         VerifierAnalysis verifier;
         ModuleAnalysisManager analysisManager;
@@ -120,7 +116,14 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr, bool allow_nested) {
         if (verifierResult.IRBroken)
             errs() << "Module is broken!\n";
 
-        #endif
+#endif
+        // Optimize module
+        OptimizeModule(*module);
+
+        // Dump generated IR if enabled
+        if (rt.conf.dump_assembly)
+            outs() << *module;
+
         // Add module to JIT
         auto error = rt.jit->addIRModule(ThreadSafeModule(std::move(unique_module), std::move(unique_context)));
         if (error) {

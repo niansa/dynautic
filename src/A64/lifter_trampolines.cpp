@@ -5,6 +5,8 @@
 
 #include <iostream>
 #include <thread>
+#include <llvm/Passes/PassBuilder.h>
+#include <llvm/Passes/OptimizationLevel.h>
 
 
 
@@ -241,5 +243,35 @@ llvm::FunctionCallee Lifter::GetDebugPrintTrampoline(Instance& rinst) {
     const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty()}, false);
     return rinst.module->getOrInsertFunction("DebugPrintTrampoline", ftype);
 }
+
 #endif
+void Lifter::OptimizeModule(llvm::Module& module) {
+    using namespace llvm;
+
+    // Get optimization level
+    OptimizationLevel level;
+    switch (rt.conf.llvm_opt_level) {
+    case LLVMOptimizationLevel::O0: level = OptimizationLevel::O0; break;
+    case LLVMOptimizationLevel::O1: level = OptimizationLevel::O1; break;
+    case LLVMOptimizationLevel::O2: level = OptimizationLevel::O2; break;
+    case LLVMOptimizationLevel::O3: level = OptimizationLevel::O3; break;
+    case LLVMOptimizationLevel::Os: level = OptimizationLevel::Os; break;
+    case LLVMOptimizationLevel::Oz: level = OptimizationLevel::Oz; break;
+    }
+
+    // Optimize module
+    LoopAnalysisManager la_manager;
+    FunctionAnalysisManager fa_manager;
+    CGSCCAnalysisManager cga_manager;
+    ModuleAnalysisManager ma_manager;
+    PassBuilder pass_builder;
+    pass_builder.registerModuleAnalyses(ma_manager);
+    pass_builder.registerCGSCCAnalyses(cga_manager);
+    pass_builder.registerFunctionAnalyses(fa_manager);
+    pass_builder.registerLoopAnalyses(la_manager);
+    pass_builder.crossRegisterProxies(la_manager, fa_manager, cga_manager, ma_manager);
+    ModulePassManager mp_manager;
+    mp_manager.addPass(pass_builder.buildPerModuleDefaultPipeline(level));
+    mp_manager.run(module, ma_manager);
+}
 }

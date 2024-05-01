@@ -67,4 +67,13 @@ constexpr bool operator!(OptimizationFlag f) {
     return f == no_optimizations;
 }
 
+enum class LLVMOptimizationLevel {
+    O0,
+    O1,
+    O2,
+    O3,
+    Os,
+    Oz
+};
+
 }  // namespace Dynarmic

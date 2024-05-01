@@ -135,7 +135,9 @@ class Lifter {
     static llvm::FunctionCallee GetFreezeTrampoline(Instance&);
 #ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
     static llvm::FunctionCallee GetDebugPrintTrampoline(Instance&);
+
 #endif
+    void OptimizeModule(llvm::Module&);
 
     void LiftLeaf(Instance&, VAddr addr);
     bool LiftInstruction(Instance&, const cs_insn&, const std::vector<VAddr>& noexec_addrs = {});

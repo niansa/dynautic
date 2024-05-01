@@ -7,7 +7,7 @@
 #pragma once
 
 #include "common.hpp"
-#include "optimization_flags.hpp"
+#include "optimization.hpp"
 
 #include <string>
 #include <vector>
@@ -143,6 +143,17 @@ struct UserConfig {
     /// AND the appropriate flag bits above.
     /// The prefered and tested mode for this library is with unsafe optimizations disabled.
     bool unsafe_optimizations = false;
+
+    /// This configured the optimization level LLVM optimizes generated code at. The higher
+    /// the optimization level, the longer the time recompilation takes but the faster the
+    /// generate code.
+    /// This pretty much corresponds to optimization levels used when compiling C or C++
+    /// code, and O2 is usually a good middle-ground between compilation time and runtime
+    /// speed.
+    /// Os optimizes more for low code size (thus lower memory usage) while Oz
+    /// attempts to achieve low code size at all costs.
+    /// Disabling the LLVMIROpt optimization flag causes this option to be ignored.
+    LLVMOptimizationLevel llvm_opt_level = LLVMOptimizationLevel::O2;
 
     /// When set to true, Dynautic will attempt to continue in unexpected situations (mostly
     /// those created by unsafe optimizations or incorrect imlementation) instead of raising

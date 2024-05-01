@@ -18,7 +18,7 @@ set(CAPSTONE_AARCH64_SUPPORT ON)
 add_subdirectory(externals/capstone)
 
 add_library(dynautic STATIC
-    include/dynautic/common.hpp include/dynautic/optimization_flags.hpp
+    include/dynautic/common.hpp include/dynautic/optimization.hpp
     include/dynautic/A64.hpp
     src/llvm.hpp
     src/A64/runtime.hpp src/A64/runtime.cpp
