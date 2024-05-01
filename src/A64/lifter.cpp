@@ -83,7 +83,8 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr, bool allow_nested) {
 
     // Create entry block and branch
     Instance rinst(rt, context, module, function_name);
-    rinst.QueueBranch(addr, "EntryBlock");
+    rinst.UseBasicBlock(rinst.CreateBasicBlock("EntryBlock"));
+    rinst.builder->CreateBr(rinst.QueueBranch(addr, "BranchAtEntryBlock"));
 
     // Set as top instance if not nested
     if (!nested)
@@ -115,6 +116,7 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr, bool allow_nested) {
         auto verifierResult = verifier.run(*module, analysisManager);
         if (verifierResult.IRBroken)
             errs() << "Module is broken!\n";
+        else
 
 #endif
         // Optimize module

@@ -227,12 +227,19 @@ uint8_t Lifter::InstructionLifter::GetLoadStoreFlagsAndSize(uint64_t insn_id) {
     //TODO: Validate if behavior is correct
     switch (insn_id) {
     case AArch64_INS_ALIAS_STURB:
-    case AArch64_INS_ALIAS_LDURB: extra_flags[unscaled] = extra_flags[byte] = true; break;
+    case AArch64_INS_STURB:
+    case AArch64_INS_ALIAS_LDURB:
+    case AArch64_INS_LDURB: extra_flags[unscaled] = extra_flags[byte] = true; break;
     case AArch64_INS_ALIAS_STURH:
-    case AArch64_INS_ALIAS_LDURH: extra_flags[unscaled] = extra_flags[half] = true; break;
-    case AArch64_INS_ALIAS_LDURSB: extra_flags[unscaled] = extra_flags[signed_] = extra_flags[byte] = true; break;
-    case AArch64_INS_ALIAS_LDURSH: extra_flags[unscaled] = extra_flags[signed_] = extra_flags[half] = true; break;
-    case AArch64_INS_ALIAS_LDURSW: extra_flags[unscaled] = extra_flags[signed_] = extra_flags[word] = true; break;
+    case AArch64_INS_STURH:
+    case AArch64_INS_ALIAS_LDURH:
+    case AArch64_INS_LDURH: extra_flags[unscaled] = extra_flags[half] = true; break;
+    case AArch64_INS_ALIAS_LDURSB:
+    case AArch64_INS_LDURSB: extra_flags[unscaled] = extra_flags[signed_] = extra_flags[byte] = true; break;
+    case AArch64_INS_ALIAS_LDURSH:
+    case AArch64_INS_LDURSH: extra_flags[unscaled] = extra_flags[signed_] = extra_flags[half] = true; break;
+    case AArch64_INS_ALIAS_LDURSW:
+    case AArch64_INS_LDURSW: extra_flags[unscaled] = extra_flags[signed_] = extra_flags[word] = true; break;
     case AArch64_INS_ALIAS_STUR:
     case AArch64_INS_STUR:
     case AArch64_INS_ALIAS_LDUR:
@@ -241,10 +248,13 @@ uint8_t Lifter::InstructionLifter::GetLoadStoreFlagsAndSize(uint64_t insn_id) {
     case AArch64_INS_STRB:
     case AArch64_INS_ALIAS_LDRB:
     case AArch64_INS_LDRB: extra_flags[byte] = true; break;
+    case AArch64_INS_ALIAS_LDRSW:
+    case AArch64_INS_LDRSW: extra_flags[signed_] = extra_flags[word] = true; break;
     case AArch64_INS_ALIAS_STR:
     case AArch64_INS_STR:
     case AArch64_INS_ALIAS_LDR:
     case AArch64_INS_LDR: break;
+    default: DYNAUTIC_ASSERT(!"Unknown load/store instruction");
     }
 
     return extra_flags[byte]?8:extra_flags[half]?16:extra_flags[word]?32:0;
@@ -375,19 +385,19 @@ bool Lifter::InstructionLifter::Run() {
                     p.StoreRegister(rinst, left, ConstantInt::get(rinst.GetType(left.size), right_imm), shift_type, shift);
                 }
             }
-        } break;
+        } return;
         case AArch64_INS_ALIAS_AND:
         case AArch64_INS_AND: {
             Handle3Ops(rinst.builder->CreateAnd);
-        } break;
+        } return;
         case AArch64_INS_ALIAS_BIC:
         case AArch64_INS_BIC: {
             Handle3OpsNot(rinst.builder->CreateAnd);
-        } break;
+        } return;
         case AArch64_INS_ALIAS_ORR:
         case AArch64_INS_ORR: {
             Handle3Ops(rinst.builder->CreateOr);
-        } break;
+        } return;
         case AArch64_INS_ALIAS_MVN:
         case AArch64_INS_MVNI:
         case AArch64_INS_ALIAS_ORN:
@@ -396,67 +406,73 @@ bool Lifter::InstructionLifter::Run() {
                 Handle2Ops(rinst.builder->CreateNot);
             else
                 Handle3OpsNot(rinst.builder->CreateOr);
-        } break;
+        } return;
         case AArch64_INS_ALIAS_EOR:
         case AArch64_INS_EOR: {
             Handle3Ops(rinst.builder->CreateXor);
-        } break;
+        } return;
         case AArch64_INS_ALIAS_EON:
         case AArch64_INS_EON: {
             Handle3OpsNot(rinst.builder->CreateXor);
-        } break;
+        } return;
         case AArch64_INS_ALIAS_ASR:
         case AArch64_INS_ASR: {
             HandleShift(AArch64_SFT_ASR);
-        } break;
+        } return;
         case AArch64_INS_ALIAS_LSL:
         case AArch64_INS_LSL: {
             HandleShift(AArch64_SFT_LSL);
-        } break;
+        } return;
         case AArch64_INS_ALIAS_LSR:
         case AArch64_INS_LSR: {
             HandleShift(AArch64_SFT_LSR);
-        } break;
+        } return;
         case AArch64_INS_ALIAS_ROR:
         case AArch64_INS_ROR: {
             HandleShift(AArch64_SFT_ROR);
-        } break;
+        } return;
         case AArch64_INS_CSEL: {
             const auto ops = GetOps(3);
             Value *condition = GetCondition();
             if (!condition)
                 break;
             p.StoreRegister(rinst, ops[0], rinst.builder->CreateSelect(condition, p.GetRegisterView(rinst, ops[1]), p.GetRegisterView(rinst, ops[2])));
-        } break;
+        } return;
         // Arithmetic instructions
         case AArch64_INS_ALIAS_ADD:
         case AArch64_INS_ADD: {
             Handle3Ops(rinst.builder->CreateAdd);
-        } break;
+        } return;
+        case AArch64_INS_ALIAS_SUBS:
+        case AArch64_INS_SUBS: {
+            const auto ops = GetOps(3);
+            p.rt_values.comparison = {p.GetRegisterView(rinst, ops[1]), p.GetRegisterView(rinst, ops[2])};
+            p.rt_values.dirty_comparison = true;
+        } [[fallthrough]];
         case AArch64_INS_ALIAS_SUB:
         case AArch64_INS_SUB: {
             Handle3Ops(rinst.builder->CreateSub);
-        } break;
+        } return;
         case AArch64_INS_MSUB: {
             auto ops = GetOps(4);
             Value *mul = rinst.builder->CreateMul(p.GetRegisterView(rinst, ops[1]), p.GetRegisterView(rinst, ops[2]));
             p.StoreRegister(rinst, ops[0], rinst.builder->CreateSub(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[3]), shift_type, shift), mul));
-        } break;
+        } return;
         case AArch64_INS_MADD: {
             auto ops = GetOps(4);
             Value *mul = rinst.builder->CreateMul(p.GetRegisterView(rinst, ops[1]), p.GetRegisterView(rinst, ops[2]));
             p.StoreRegister(rinst, ops[0], rinst.builder->CreateAdd(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[3]), shift_type, shift), mul));
-        } break;
+        } return;
         case AArch64_INS_ALIAS_NEG:
         case AArch64_INS_NEG: {
             Handle2Ops(rinst.builder->CreateNeg);
-        } break;
+        } return;
         case AArch64_INS_ALIAS_UMULL:
         case AArch64_INS_UMULL:
         case AArch64_INS_ALIAS_MUL:
         case AArch64_INS_MUL: {
             Handle3Ops(rinst.builder->CreateMul);
-        } break;
+        } return;
         case AArch64_INS_UMULH: {
             const auto ops = GetOps(3);
             Value *left = rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[1]), rinst.builder->getInt128Ty(), false);
@@ -464,42 +480,48 @@ bool Lifter::InstructionLifter::Run() {
             Value *result = rinst.builder->CreateMul(left, right);
             result = rinst.builder->CreateLShr(result, 64);
             p.StoreRegister(rinst, ops[0], rinst.builder->CreateIntCast(result, rinst.builder->getInt64Ty(), false));
-        } break;
+        } return;
         case AArch64_INS_UDIV: {
             Handle3Ops(rinst.builder->CreateUDiv);
-        } break;
+        } return;
         case AArch64_INS_SDIV: {
             Handle3Ops(rinst.builder->CreateSDiv);
-        } break;
+        } return;
         case AArch64_INS_ALIAS_SXTW:
         case AArch64_INS_SXTW: {
             const auto ops = GetOps(2);
             p.StoreRegister(rinst, ops[0], rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[1]), rinst.builder->getInt64Ty(), true));
-        } break;
+        } return;
         case AArch64_INS_ALIAS_CMP: {
             const auto ops = GetOps(2);
-            p.rt_values.comparison.first = p.GetRegisterView(rinst, ops[0]);
-            p.rt_values.comparison.second = p.GetRegisterView(rinst, ops[1]);
+            p.rt_values.comparison = {p.GetRegisterView(rinst, ops[0]), p.GetRegisterView(rinst, ops[1])};
             p.rt_values.dirty_comparison = true;
-        } break;
+        } return;
         case AArch64_INS_ADR: {
             const auto ops = GetOps(2);
             p.StoreRegister(rinst, ops[0], p.GetRegisterView(rinst, ops[1]));
-        } break;
+        } return;
         case AArch64_INS_ADRP: {
             const auto ops = GetOps(2);
             p.StoreRegister(rinst, ops[0], p.GetRegisterView(rinst, ops[1]));
-        } break;
+        } return;
         // Load and store instructions
         case AArch64_INS_ALIAS_LDURB:
+        case AArch64_INS_LDURB:
         case AArch64_INS_ALIAS_LDURH:
+        case AArch64_INS_LDURH:
         case AArch64_INS_ALIAS_LDURSB:
+        case AArch64_INS_LDURSB:
         case AArch64_INS_ALIAS_LDURSH:
+        case AArch64_INS_LDURSH:
         case AArch64_INS_ALIAS_LDURSW:
+        case AArch64_INS_LDURSW:
         case AArch64_INS_ALIAS_LDUR:
         case AArch64_INS_LDUR:
         case AArch64_INS_ALIAS_LDRB:
         case AArch64_INS_LDRB:
+        case AArch64_INS_ALIAS_LDRSW:
+        case AArch64_INS_LDRSW:
         case AArch64_INS_ALIAS_LDR:
         case AArch64_INS_LDR: {
             const uint8_t msiz = GetLoadStoreFlagsAndSize(id);
@@ -512,9 +534,11 @@ bool Lifter::InstructionLifter::Run() {
             if (msiz)
                 value = rinst.builder->CreateIntCast(value, rinst.GetType(op.size), extra_flags[signed_]);
             p.StoreRegister(rinst, op, value);
-        } break;
+        } return;
         case AArch64_INS_ALIAS_STURB:
+        case AArch64_INS_STURB:
         case AArch64_INS_ALIAS_STURH:
+        case AArch64_INS_STURH:
         case AArch64_INS_ALIAS_STUR:
         case AArch64_INS_STUR:
         case AArch64_INS_ALIAS_STRB:
@@ -531,7 +555,7 @@ bool Lifter::InstructionLifter::Run() {
             if (displacement)
                 reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(static_cast<uint64_t>(displacement)));
             p.CreateMemoryStore(rinst, reference, value);
-        } break;
+        } return;
         case AArch64_INS_ALIAS_LDPSW:
         case AArch64_INS_LDPSW: {
             const auto ops = GetOps(2);
@@ -542,7 +566,7 @@ bool Lifter::InstructionLifter::Run() {
             p.StoreRegister(rinst, ops[0], rinst.builder->CreateIntCast(p.CreateMemoryLoad(rinst, reference, rinst.builder->getInt32Ty()), type, true));
             reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
             p.StoreRegister(rinst, ops[1], rinst.builder->CreateIntCast(p.CreateMemoryLoad(rinst, reference, rinst.builder->getInt32Ty()), type, true));
-        } break;
+        } return;
         case AArch64_INS_ALIAS_LDP:
         case AArch64_INS_LDP: {
             const auto ops = GetOps(2);
@@ -553,7 +577,7 @@ bool Lifter::InstructionLifter::Run() {
             p.StoreRegister(rinst, ops[0], p.CreateMemoryLoad(rinst, reference, type));
             reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
             p.StoreRegister(rinst, ops[1], p.CreateMemoryLoad(rinst, reference, type));
-        } break;
+        } return;
         case AArch64_INS_ALIAS_STP:
         case AArch64_INS_STP: {
             const auto ops = GetOps(2);
@@ -563,7 +587,7 @@ bool Lifter::InstructionLifter::Run() {
             p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[0]));
             reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
             p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[1]));
-        } break;
+        } return;
         // Branch instructions
         case AArch64_INS_BL: {
             // Use BLR implementation if address is immediate
@@ -600,6 +624,18 @@ bool Lifter::InstructionLifter::Run() {
             Value *cond = rinst.builder->CreateICmp(extra_flags[0]?ICmpInst::ICMP_NE:ICmpInst::ICMP_EQ, rinst.builder->CreateIntCast(p.GetRegisterView(rinst, GetOps(1)[0]), rinst.builder->getInt64Ty(), false), rinst.builder->getInt64(0));
             p.CreateConditionalBranch(rinst, PrepareBranch(1), p.PrepareBranch(rinst, false_addr), cond);
         } return;
+        case AArch64_INS_TBNZ: extra_flags[0] = true; [[fallthrough]];
+        case AArch64_INS_TBZ: {
+            const auto ops = GetOps(2);
+            p.CreateRegisterSave(rinst);
+            const VAddr false_addr = insn.address+4;
+            Value *value = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[0]), rinst.builder->CreateShl(ConstantInt::get(rinst.GetType(ops[0].size), 1), p.GetRegisterView(rinst, ops[1])));
+            Value *cond = rinst.builder->CreateICmpNE(value, ConstantInt::get(rinst.GetType(ops[0].size), 0));
+            std::pair<BasicBlock *, BasicBlock *> branches = {PrepareBranch(2), p.PrepareBranch(rinst, false_addr)};
+            if (extra_flags[0])
+                std::swap(branches.first, branches.second);
+            p.CreateConditionalBranch(rinst, branches.first, branches.second, cond);
+        } return;
         case AArch64_INS_ALIAS_RET:
         case AArch64_INS_RET: {
             //TODO: Should do some optimization here in cases where the return address can be determined at compile time
@@ -628,23 +664,23 @@ bool Lifter::InstructionLifter::Run() {
             }
             }
             p.StoreRegister(rinst, dest, value);
-        } break;
+        } return;
         case AArch64_INS_ALIAS_NOP:
         case AArch64_INS_HINT: {
             // This is no-op: It does nothing. Nothing to be done here. We don't need it.
-        } break;
+        } return;
         case AArch64_INS_SVC: {
             const uint32_t swi = static_cast<uint32_t>(detail.operands[0].imm);
             p.CreateSvcTrampoline(rinst, swi);
-        } break;
+        } return;
         case AArch64_INS_BRK: {
             //if (rinst.rt.conf.hook_hint_instructions)  TODO: Should this check happen here?
             p.CreateExceptionTrampoline(rinst, Exception::Breakpoint);
-        } break;
+        } return;
         case AArch64_INS_ALIAS_YIELD: {
             if (rinst.rt.conf.hook_hint_instructions)
                 p.CreateExceptionTrampoline(rinst, Exception::Yield);
-        } break;
+        } return;
         case AArch64_INS_UDF:
         default: {
             // Bad/unknown instruction, check if noexec address
