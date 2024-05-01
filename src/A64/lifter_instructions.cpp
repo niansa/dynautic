@@ -506,14 +506,6 @@ bool Lifter::InstructionLifter::Run() {
             p.rt_values.comparison = {p.GetRegisterView(rinst, ops[0]), p.GetRegisterView(rinst, ops[1])};
             p.rt_values.dirty_comparison = true;
         } return;
-        case AArch64_INS_CCMP: { //TODO: Verify behavior
-            const auto ops = GetOps(3);
-            Value *condition = GetCondition();
-            Value *imm = rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[0]), rinst.builder->getInt64Ty(), false);
-            p.rt_values.comparison.first = rinst.builder->CreateSelect(condition, p.GetRegisterView(rinst, ops[0]), imm);
-            p.rt_values.comparison.second = rinst.builder->CreateSelect(condition, p.GetRegisterView(rinst, ops[1]), imm);
-            p.rt_values.dirty_comparison = true;
-        } return;
         case AArch64_INS_ADR: {
             const auto ops = GetOps(2);
             p.StoreRegister(rinst, ops[0], p.GetRegisterView(rinst, ops[1]));
