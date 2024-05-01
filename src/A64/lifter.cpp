@@ -40,106 +40,99 @@ FunctionCallee Lifter::GetLiftedFunction(Instance& rinst, VAddr addr) {
     return rinst.DeclareFunction(GetFunctionName(addr));
 }
 
-std::optional<ExecutorAddr> Lifter::Lift(VAddr addr, bool allow_nested) {
+std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
     DYNAUTIC_ASSERT(IsOk() && rt.jit);
 
-    if (IsLiftPending(addr))
-        return {};
+    // Skip if already compiled
+    if (auto expected_address = rt.jit->lookup(GetFunctionName(addr)))
+        return expected_address.get();
 
+    // Enqueue address
+    queued_functions.emplace(addr);
+
+    // Set up context and module
+    std::unique_ptr<LLVMContext> context = std::make_unique<LLVMContext>();
+    std::unique_ptr<Module> module = std::make_unique<Module>("ModuleAt"+std::to_string(addr), *context);
+
+    // List of processed but not yet compiled functions
+    std::vector<VAddr> processed_fncs;
+
+    // Go through all functions
+    while (!queued_functions.empty()) {
+        const VAddr addr = queued_functions.front();
+
+        // Skip already processed functions
+        if (std::find(processed_fncs.begin(), processed_fncs.end(), addr) != processed_fncs.end()) {
+            queued_functions.pop();
+            continue;
+        }
+
+        // Get function name
+        const std::string function_name = GetFunctionName(addr);
+
+        // Create entry block and branch
+        Instance rinst(rt, context.get(), module.get(), function_name);
+        rinst.UseBasicBlock(rinst.CreateBasicBlock("EntryBlock"));
+        rinst.builder->CreateBr(rinst.QueueBranch(addr, "BranchAtEntryBlock"));
+
+        // Lift each leaf until none are left
+        while (rinst.NextBranch()) {
+            if (!rinst.IsDynamicBranch()) {
+                // Lift leaf with known address
+                rinst.pc = rinst.GetBranchAddr();
+                CreateDebugPrintTrampoline(rinst, "Branch completed");
+                LiftLeaf(rinst, rinst.pc);
+            } else {
+                CreateDebugPrintTrampoline(rinst, "Dynamic branch happening...");
+                CreateLiftTrampolineBlock(rinst, rinst.GetBranchOrigin());
+            }
+        }
+
+        // Add function to list of processed functions
+        processed_fncs.push_back(addr);
+
+        // Remove function from queue
+        queued_functions.pop();
+    }
+
+#ifdef ENABLE_LLVM_VALIDATION
+    // Run verifier
+    VerifierAnalysis verifier;
+    ModuleAnalysisManager analysisManager;
+    auto verifierResult = verifier.run(*module, analysisManager);
+    if (verifierResult.IRBroken)
+        errs() << "Module is broken!\n";
+    else
+
+#endif
+    // Optimize module
+    if (rt.conf.HasOptimization(OptimizationFlag::LLVMIROpt))
+        OptimizeModule(*module);
+
+    // Dump generated IR if enabled
+    if (rt.conf.dump_assembly)
+        outs() << *module;
+
+    // Add module to JIT
+    auto error = rt.jit->addIRModule(ThreadSafeModule(std::move(module), std::move(context)));
+    if (error) {
+        errs() << "Failed to add module: " << error << '\n';
+        return {};
+    }
+
+    // Look up added function and return address
+    return rt.jit->lookup(GetFunctionName(addr)).get();
+}
+
+void Lifter::DeferLift(VAddr addr) {
     // Get module name
     const std::string function_name = GetFunctionName(addr);
 
-    // Try existing functions in compiled modules first
-    if (auto executor_addr = rt.jit->lookup(function_name))
-        return executor_addr.get();
+    // Skip if already compiled
+    if (rt.jit->lookup(function_name))
+        return;
 
-    // Check if nested
-    const bool nested = top_instance != nullptr;
-    DYNAUTIC_ASSERT(!(nested && !allow_nested));
-
-    // Set up context and module
-    std::unique_ptr<LLVMContext> unique_context;
-    std::unique_ptr<Module> unique_module;
-    LLVMContext *context;
-    Module *module;
-
-    if (!nested) {
-        // Create context
-        unique_context = std::make_unique<LLVMContext>();
-        context = unique_context.get();
-
-        // Create new module
-        unique_module = std::make_unique<Module>("ModuleAt"+std::to_string(addr), *context);
-        module = unique_module.get();
-    } else {
-        // Copy context and module from top instance
-        context = top_instance->context;
-        module = top_instance->module;
-
-        // Try exiting functions in current module first
-        if (module->getFunction(function_name))
-            return {};
-    }
-
-    // Create entry block and branch
-    Instance rinst(rt, context, module, function_name);
-    rinst.UseBasicBlock(rinst.CreateBasicBlock("EntryBlock"));
-    rinst.builder->CreateBr(rinst.QueueBranch(addr, "BranchAtEntryBlock"));
-
-    // Set as top instance if not nested
-    if (!nested)
-        top_instance = &rinst;
-
-    // Lift each leaf until none are left
-    pending.push_back(addr);
-    while (rinst.NextBranch()) {
-        if (!rinst.IsDynamicBranch()) {
-            // Lift leaf with known address
-            rinst.pc = rinst.GetBranchAddr();
-            CreateDebugPrintTrampoline(rinst, "Branch completed");
-            LiftLeaf(rinst, rinst.pc);
-        } else {
-            CreateDebugPrintTrampoline(rinst, "Dynamic branch happening...");
-            CreateLiftTrampolineBlock(rinst, rinst.GetBranchOrigin());
-        }
-    }
-    pending.remove(addr);
-
-    // Finalize module only if not nested
-    if (!nested) {
-        top_instance = nullptr;
-
-#ifdef ENABLE_LLVM_VALIDATION
-        // Run verifier
-        VerifierAnalysis verifier;
-        ModuleAnalysisManager analysisManager;
-        auto verifierResult = verifier.run(*module, analysisManager);
-        if (verifierResult.IRBroken)
-            errs() << "Module is broken!\n";
-        else
-
-#endif
-        // Optimize module
-        if (rt.conf.HasOptimization(OptimizationFlag::LLVMIROpt))
-            OptimizeModule(*module);
-
-        // Dump generated IR if enabled
-        if (rt.conf.dump_assembly)
-            outs() << *module;
-
-        // Add module to JIT
-        auto error = rt.jit->addIRModule(ThreadSafeModule(std::move(unique_module), std::move(unique_context)));
-        if (error) {
-            errs() << "Failed to add module: " << error << '\n';
-            return {};
-        }
-
-        // Look up added function and return address
-        return rt.jit->lookup(function_name).get();
-    }
-
-    // Return nothing since we're nested
-    return {};
+    queued_functions.emplace(addr);
 }
 
 void Lifter::LiftLeaf(Instance& rinst, VAddr addr) {

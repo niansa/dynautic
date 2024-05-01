@@ -8,9 +8,11 @@ using namespace llvm::orc;
 
 namespace Dynautic::A64 {
 llvm::Value *Lifter::PerformShift(Instance& rinst, llvm::Value *value, aarch64_shifter type, Value *shift) {
+    if (type == AArch64_SFT_INVALID)
+        return value;
+
     shift = rinst.builder->CreateTrunc(shift, value->getType());
     switch (type) {
-    case AArch64_SFT_INVALID: return value;
     case AArch64_SFT_LSL: return rinst.builder->CreateShl(value, shift);
     case AArch64_SFT_MSL: return rinst.builder->CreateSub(rinst.builder->CreateShl(shift, value), shift); // TODO: Verify
     case AArch64_SFT_LSR: return rinst.builder->CreateLShr(value, shift);

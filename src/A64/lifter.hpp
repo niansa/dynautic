@@ -4,7 +4,7 @@
 
 #include <string>
 #include <string_view>
-#include <list>
+#include <queue>
 #include <optional>
 #include <dynautic/A64.hpp>
 #include <capstone/capstone.h>
@@ -70,10 +70,7 @@ class Lifter {
 
     csh cs_handle;
 
-    std::list<VAddr> pending;
-
-    /// Top instance holding context and module for nested Lift() calls.
-    Instance *top_instance = nullptr;
+    std::queue<VAddr> queued_functions;
 
     struct RuntimeValues {
         std::array<llvm::Value *, 4> scratch_registers;
@@ -144,15 +141,6 @@ class Lifter {
 
     static std::string GetFunctionName(VAddr addr);
 
-    /// This function starts lifting code at given address. It then returns a pointer to the function
-    /// generated from that address. It might however also generate functions called by code at given
-    /// address.
-    /// Normally, this function returns an address on success.
-    /// But when nested (called recursively) it never returns an address. Instead, it returns nothing
-    /// after lifting. The generated function(s) will still be available right after calling if the
-    /// function didn't fail (which it in no situation should).
-    std::optional<llvm::orc::ExecutorAddr> Lift(VAddr addr, bool allow_nested);
-
 public:
     Runtime::Impl& rt;
 
@@ -162,22 +150,13 @@ public:
     bool IsOk() const {
         return cs_handle != 0;
     }
-    bool IsLiftPending(VAddr addr) {
-        for (const VAddr pending_addr : pending)
-            if (addr == pending_addr)
-                return true;
-        return false;
-    }
 
     static void SetupTrampolines(llvm::orc::LLJIT&);
 
-    static llvm::FunctionCallee GetLiftedFunction(Instance&, VAddr addr);
+    /// This function MUST NOT be called recursively
+    std::optional<llvm::orc::ExecutorAddr> Lift(VAddr addr);
+    void DeferLift(VAddr addr);
 
-    std::optional<llvm::orc::ExecutorAddr> Lift(VAddr addr) {
-        return Lift(addr, false);
-    }
-    void LiftNested(VAddr addr) {
-        Lift(addr, true);
-    }
+    static llvm::FunctionCallee GetLiftedFunction(Instance&, VAddr addr);
 };
 }

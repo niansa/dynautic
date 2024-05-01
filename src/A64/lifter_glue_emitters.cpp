@@ -126,7 +126,7 @@ void Lifter::CreateCall(Instance& rinst, VAddr origin, VAddr address) {
     // Prepare for call
     CreateRegisterSave(rinst);
     // Try to lift given instruction
-    LiftNested(address);
+    DeferLift(address);
     // Call into lifted address
     CallInst *call = rinst.builder->CreateCall(Lifter::GetLiftedFunction(rinst, address));
     call->setTailCall();

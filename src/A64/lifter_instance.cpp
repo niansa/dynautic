@@ -6,11 +6,14 @@ using namespace llvm::orc;
 
 
 namespace Dynautic::A64 {
-Lifter::Instance::Instance(Runtime::Impl& runtime, llvm::LLVMContext *context, llvm::Module *module, const llvm::Twine& function_name)
+Lifter::Instance::Instance(Runtime::Impl& runtime, llvm::LLVMContext *context, llvm::Module *module, const std::string& function_name)
       : rt(runtime), context(context), module(module) {
-    func = Function::Create(FunctionType::get(Type::getVoidTy(*context),
-                                              {}, false),
-                            Function::ExternalLinkage, function_name, module);
+    // Try to get function first, if that fails, create
+    if (!(func = module->getFunction(function_name))) {
+        func = Function::Create(FunctionType::get(Type::getVoidTy(*context),
+                                                  {}, false),
+                                Function::ExternalLinkage, function_name, *module);
+    }
     func->setCallingConv(CallingConv::Tail);
 }
 

@@ -48,7 +48,7 @@ public:
     bool block_terminated;
     VAddr pc = 0xbad0bad0bad0bad0;
 
-    Instance(Runtime::Impl& runtime, llvm::LLVMContext *context, llvm::Module *module, const llvm::Twine& function_name);
+    Instance(Runtime::Impl& runtime, llvm::LLVMContext *context, llvm::Module *module, const std::string& function_name);
 
     llvm::BasicBlock *CreateBasicBlock(const llvm::Twine& name) {
         return llvm::BasicBlock::Create(*context, name, func);
