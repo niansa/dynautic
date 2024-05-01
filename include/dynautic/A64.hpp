@@ -173,13 +173,14 @@ struct UserConfig {
 
     /// When set to true, cache will be used to generate more optimized code. This is only
     /// useful when cache entries previously generated with update_cache enabled are loaded.
+    /// Note this will make initial compilation slow but happen much less frequently.
     /// Requires BlockLinking optimization.
     bool use_cache = true;
 
     /// When set to true, no dynamic code generation is performed. This leads to optimal
     /// performance when using cache data, but will crash when executing any code that hasn't
-    /// been cached and needs dynamic compilation. Requires unsafe_optimizations and
-    /// use_cache.
+    /// been cached and needs dynamic compilation.
+    /// Requires unsafe_optimizations and use_cache.
     bool fully_static = false;
 
     /// When set to true, UserCallbacks::InstructionSynchronizationBarrierRaised will be

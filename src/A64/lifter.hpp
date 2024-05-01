@@ -179,6 +179,5 @@ public:
     void LiftNested(VAddr addr) {
         Lift(addr, true);
     }
-
 };
 }
