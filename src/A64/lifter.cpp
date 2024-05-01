@@ -118,7 +118,8 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr, bool allow_nested) {
 
 #endif
         // Optimize module
-        OptimizeModule(*module);
+        if (rt.conf.HasOptimization(OptimizationFlag::LLVMIROpt))
+            OptimizeModule(*module);
 
         // Dump generated IR if enabled
         if (rt.conf.dump_assembly)
