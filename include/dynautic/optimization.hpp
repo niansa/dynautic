@@ -15,7 +15,8 @@ enum class OptimizationFlag : std::uint32_t {
     /// directly to other basic blocks if the destination PC is predictable at JIT-time.
     /// This is a safe optimization.
     BlockLinking = 0x00000001,
-    /// This runs LLVM optimization steps on the generated IR.
+    /// This runs LLVM optimization steps on the generated IR. This is only useful for long-
+    /// running code and will affect short-running code negatively.
     /// This is a safe optimization.
     LLVMIROpt = 0x00000020,
 
