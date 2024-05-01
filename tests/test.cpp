@@ -262,6 +262,13 @@ int main(int argc, char** argv) {
                       0xd65f03c0  // ret
                   }, unicorn.get());
 
+    dynautic->RunTest("Simple FMOV instruction", {
+                      0x9e670000, // fmov d0, x0
+                      0x9e670021, // fmov d1, x1
+                      0x9e660020, // fmov x0, d1
+                      0xd65f03c0  // ret
+                  }, unicorn.get());
+
     for (const auto& entry : std::filesystem::directory_iterator(TEST_BINS)) {
         if (!entry.is_regular_file())
             continue;

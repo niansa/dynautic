@@ -11,7 +11,11 @@ namespace Dynautic::A64 {
 uint64_t Lifter::InstructionLifter::GetImm(const cs_aarch64_op& op) {
     shift = static_cast<uint8_t>(op.shift.value);
     shift_type = op.shift.type;
-    return static_cast<uint64_t>(op.imm);
+    switch (op.type) {
+    case AArch64_OP_IMM: return static_cast<uint64_t>(op.imm);
+    case AArch64_OP_FP: return *reinterpret_cast<const uint64_t *>(&op.fp);
+    default: assert(!"Unsupported immediate type");
+    }
 }
 
 uint16_t Lifter::InstructionLifter::GetImm16WithShift(uint64_t value) {
@@ -307,10 +311,12 @@ bool Lifter::InstructionLifter::Run() {
     // Debug message
     p.CreateDebugPrintTrampoline(rinst, "Executing instruction");
 
-    // Handle conditional predicates (except CSEL)
+    // Handle conditional predicates (except CSEL and CCMP)
     RuntimeValues rt_values_backup;
     BasicBlock *next_block = nullptr;
-    const bool conditional = detail.cc != AArch64CC_Invalid && insn.id != AArch64_INS_CSEL;
+    const bool conditional = detail.cc != AArch64CC_Invalid
+                             && insn.id != AArch64_INS_CSEL
+                             && insn.id != AArch64_INS_CCMP;
     if (conditional) {
         Value *condition = GetCondition();
         if (!condition)
@@ -337,6 +343,8 @@ bool Lifter::InstructionLifter::Run() {
         case AArch64_INS_MOVK: extra_flags[0] = true; [[fallthrough]];
         case AArch64_INS_ALIAS_MOVZ:
         case AArch64_INS_MOVZ:
+        case AArch64_INS_ALIAS_FMOV:
+        case AArch64_INS_FMOV:
         case AArch64_INS_ALIAS_MOV:
         case AArch64_INS_MOV: {
             // Get operands
@@ -357,6 +365,7 @@ bool Lifter::InstructionLifter::Run() {
                         shift_type = op.shift.type;
                     }
                 } break;
+                case AArch64_OP_FP:
                 case AArch64_OP_IMM: {
                     DYNAUTIC_ASSERT(op_idx == 1);
                     right_imm = GetImm(op);
@@ -495,6 +504,14 @@ bool Lifter::InstructionLifter::Run() {
         case AArch64_INS_ALIAS_CMP: {
             const auto ops = GetOps(2);
             p.rt_values.comparison = {p.GetRegisterView(rinst, ops[0]), p.GetRegisterView(rinst, ops[1])};
+            p.rt_values.dirty_comparison = true;
+        } return;
+        case AArch64_INS_CCMP: { //TODO: Verify behavior
+            const auto ops = GetOps(3);
+            Value *condition = GetCondition();
+            Value *imm = rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[0]), rinst.builder->getInt64Ty(), false);
+            p.rt_values.comparison.first = rinst.builder->CreateSelect(condition, p.GetRegisterView(rinst, ops[0]), imm);
+            p.rt_values.comparison.second = rinst.builder->CreateSelect(condition, p.GetRegisterView(rinst, ops[1]), imm);
             p.rt_values.dirty_comparison = true;
         } return;
         case AArch64_INS_ADR: {
