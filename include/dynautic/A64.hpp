@@ -160,6 +160,13 @@ struct UserConfig {
     /// an UnpredictableInstruction exception. Assertions may still trigger if enabled
     bool unsafe_unexpected_situation_handling = false;
 
+    /// When set to true, no memory access callbacks other than MemoryReadCode are called.
+    /// Instead, all memory accesses are translated to native memory accesses. Note that
+    /// this allows the emulated code to hijack the rest of the application.
+    /// Note that if this is enabled it is up to the operating system to handle access
+    /// faults. The application is responsible for setting up handlers indepdently.
+    bool native_memory = false;
+
     /// When set to true, UserCallbacks::DataCacheOperationRaised will be called when any
     /// data cache instruction is executed. Notably DC ZVA will not implicitly do anything.
     /// When set to false, UserCallbacks::DataCacheOperationRaised will never be called.
@@ -293,6 +300,7 @@ struct UserConfig {
 
     /// This allows accurately emulating protection fault handlers. If true, we check
     /// for exit after every data memory access by the emulated program.
+    /// Useless if combined with native_memory.
     bool check_halt_on_memory_access = false;
 
     /// This option allows you to disable cycle counting. If this is set to false,

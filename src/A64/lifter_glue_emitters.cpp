@@ -89,6 +89,9 @@ void Lifter::CreateStoreToPtr(Instance& rinst, void *ptr, llvm::Value *value) {
 }
 
 Value *Lifter::CreateMemoryLoad(Instance& rinst, llvm::Value *address, Type *type) {
+    if (rt.conf.native_memory)
+        return rinst.builder->CreateLoad(type, rinst.builder->CreateIntToPtr(address, rinst.builder->getPtrTy()));
+
     Value *runtime = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
     Value *fres = rinst.builder->CreateCall(GetMemoryRead(rinst, static_cast<uint8_t>(type->getIntegerBitWidth())), {runtime, address});
     if (rt.conf.check_halt_on_memory_access)
@@ -97,6 +100,11 @@ Value *Lifter::CreateMemoryLoad(Instance& rinst, llvm::Value *address, Type *typ
 }
 
 void Lifter::CreateMemoryStore(Instance& rinst, llvm::Value *address, llvm::Value *data) {
+    if (rt.conf.native_memory) {
+        rinst.builder->CreateStore(data, rinst.builder->CreateIntToPtr(address, rinst.builder->getPtrTy()));
+        return;
+    }
+
     Value *runtime = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
     rinst.builder->CreateCall(GetMemoryWrite(rinst, static_cast<uint8_t>(data->getType()->getIntegerBitWidth())), {runtime, address, data});
     if (rt.conf.check_halt_on_memory_access)

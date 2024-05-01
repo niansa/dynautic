@@ -33,7 +33,7 @@ void ExecutionContext::Create(const llvm::orc::ExecutorAddr& entry) {
     }, 0);
     desc.user_data = reinterpret_cast<void *>(data);
     mco_create(&coro, &desc);
-    Resume();
+    Resume(); // Despite clang-analyzer complaining, no memory will leak here
 }
 void ExecutionContext::Destroy() {
     if (coro) {

@@ -135,7 +135,6 @@ public:
 
             // Configure
             user_config.update_cache = !(user_config.use_cache = user_config.unsafe_optimizations = user_config.fully_static = !cache.empty());
-            user_config.native_memory = run == 2;
             //user_config.dump_assembly = user_config.fully_static;
 
             // Create runtime
@@ -154,18 +153,8 @@ public:
             for (unsigned addr = exe_base, idx = 0; idx != instructions.size(); addr += 4, ++idx)
                 env.MemoryWrite32(addr, instructions[idx]);
 
-            // Set up stack
-            Dynautic::A64::VAddr stack_addr = this->stack_addr;
-            if (user_config.native_memory)
-                stack_addr = reinterpret_cast<Dynautic::A64::VAddr>(&env.memory[stack_addr]);
-
             // Set up registers
             cpu.SetRegister(0, 0xfabd3dd59df77212);
-            cpu.SetRegister(1, 0xabcdfea1);
-            cpu.SetRegister(2, 0x0);
-            cpu.SetRegister(10, heap_base);
-            cpu.SetRegister(23, exit_addr);
-            cpu.SetRegister(24, exe_base);
             cpu.SetRegister(30, exit_addr);
             cpu.SetSP(stack_addr);
             cpu.SetPC(exe_base);
@@ -190,8 +179,7 @@ public:
                 fres = cpu.GetRegister(0);
             else if (fres != cpu.GetRegister(0))
                 fres = 0xcac3bad;
-            if (!user_config.native_memory)
-                memory = env.memory;
+            memory = env.memory;
 
             std::cout << "Dynautic pass #" << std::dec << run << " done after " << duration << "ms!" << std::endl;
         }
