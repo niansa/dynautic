@@ -638,7 +638,8 @@ bool Lifter::InstructionLifter::Run() {
         case AArch64_INS_CBZ: {
             p.CreateRegisterSave(rinst);
             const VAddr false_addr = insn.address+4;
-            Value *cond = rinst.builder->CreateICmp(extra_flags[0]?ICmpInst::ICMP_NE:ICmpInst::ICMP_EQ, rinst.builder->CreateIntCast(p.GetRegisterView(rinst, GetOps(1)[0]), rinst.builder->getInt64Ty(), false), rinst.builder->getInt64(0));
+            const auto pred = extra_flags[0]?ICmpInst::ICMP_NE:ICmpInst::ICMP_EQ;
+            Value *cond = rinst.builder->CreateICmp(pred, rinst.builder->CreateIntCast(p.GetRegisterView(rinst, GetOps(1)[0]), rinst.builder->getInt64Ty(), false), rinst.builder->getInt64(0));
             p.CreateConditionalBranch(rinst, PrepareBranch(1), p.PrepareBranch(rinst, false_addr), cond);
         } return;
         case AArch64_INS_TBNZ: extra_flags[0] = true; [[fallthrough]];
@@ -647,10 +648,9 @@ bool Lifter::InstructionLifter::Run() {
             p.CreateRegisterSave(rinst);
             const VAddr false_addr = insn.address+4;
             Value *value = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[0]), rinst.builder->CreateShl(ConstantInt::get(rinst.GetType(ops[0].size), 1), p.GetRegisterView(rinst, ops[1])));
-            Value *cond = rinst.builder->CreateICmpNE(value, ConstantInt::get(rinst.GetType(ops[0].size), 0));
+            const auto pred = extra_flags[0]?ICmpInst::ICMP_NE:ICmpInst::ICMP_EQ;
+            Value *cond = rinst.builder->CreateICmp(pred, value, ConstantInt::get(rinst.GetType(ops[0].size), 0));
             std::pair<BasicBlock *, BasicBlock *> branches = {PrepareBranch(2), p.PrepareBranch(rinst, false_addr)};
-            if (extra_flags[0])
-                std::swap(branches.first, branches.second);
             p.CreateConditionalBranch(rinst, branches.first, branches.second, cond);
         } return;
         case AArch64_INS_ALIAS_RET:
