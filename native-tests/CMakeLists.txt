@@ -9,3 +9,4 @@ add_subdirectory(.. dynautic)
 
 add_executable(dynautic_test test.cpp common.hpp dynautic.hpp native.hpp timer.hpp)
 target_link_libraries(dynautic_test PRIVATE dynautic unicorn)
+target_compile_options(dynautic_test PRIVATE -fno-stack-protector -mgeneral-regs-only)

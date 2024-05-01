@@ -14,59 +14,30 @@ public:
     Dynautic::A64::Runtime *cpu;
 
     u64 ticks_left = 0;
-    std::array<u8, TestBase::mem_size> memory{};
 
-    u8 MemoryRead8(u64 vaddr) override {
-        if (vaddr >= memory.size()) {
-            cpu->HaltExecution(Dynautic::HaltReason::MemoryAbort);
-            return 0;
+    std::optional<std::uint32_t> MemoryReadCode(Dynautic::A64::VAddr vaddr) override {
+        switch (vaddr) {
+        case TestBase::exit_addr + 0: return 0xd4000081; // svc #4
+        case TestBase::exit_addr + 4: return 0xd65f03c0; // ret
+        default: {
+            if (vaddr > TestBase::exit_addr && vaddr < TestBase::exit_addr + 0x10000)
+                return {};
+            return *reinterpret_cast<u32*>(vaddr);
+        };
         }
-        return memory[vaddr];
     }
 
-    u16 MemoryRead16(u64 vaddr) override {
-        return u16(MemoryRead8(vaddr)) | u16(MemoryRead8(vaddr + 1)) << 8;
-    }
+    u8 MemoryRead8(Dynautic::A64::VAddr) override {return {};}
+    u16 MemoryRead16(Dynautic::A64::VAddr) override {return {};}
+    u32 MemoryRead32(Dynautic::A64::VAddr) override {return {};}
+    u64 MemoryRead64(Dynautic::A64::VAddr) override {return {};}
+    Dynautic::A64::Vector MemoryRead128(Dynautic::A64::VAddr) override {return {};}
 
-    u32 MemoryRead32(u64 vaddr) override {
-        return u32(MemoryRead16(vaddr)) | u32(MemoryRead16(vaddr + 2)) << 16;
-    }
-
-    u64 MemoryRead64(u64 vaddr) override {
-        return u64(MemoryRead32(vaddr)) | u64(MemoryRead32(vaddr + 4)) << 32;
-    }
-
-    u128 MemoryRead128(u64 vaddr) override {
-        return {MemoryRead64(vaddr), MemoryRead64(vaddr + 8)};
-    }
-
-    void MemoryWrite8(u64 vaddr, u8 value) override {
-        if (vaddr >= memory.size()) {
-            cpu->HaltExecution(Dynautic::HaltReason::MemoryAbort);
-            return;
-        }
-        memory[vaddr] = value;
-    }
-
-    void MemoryWrite16(u64 vaddr, u16 value) override {
-        MemoryWrite8(vaddr, u8(value));
-        MemoryWrite8(vaddr + 1, u8(value >> 8));
-    }
-
-    void MemoryWrite32(u64 vaddr, u32 value) override {
-        MemoryWrite16(vaddr, u16(value));
-        MemoryWrite16(vaddr + 2, u16(value >> 16));
-    }
-
-    void MemoryWrite64(u64 vaddr, u64 value) override {
-        MemoryWrite32(vaddr, u32(value));
-        MemoryWrite32(vaddr + 4, u32(value >> 32));
-    }
-
-    void MemoryWrite128(u64 vaddr, u128 value) override {
-        MemoryWrite64(vaddr, value[0]);
-        MemoryWrite64(vaddr+8, value[1]);
-    }
+    void MemoryWrite8(Dynautic::A64::VAddr, u8 ) override {}
+    void MemoryWrite16(Dynautic::A64::VAddr, u16) override {}
+    void MemoryWrite32(Dynautic::A64::VAddr, u32) override {}
+    void MemoryWrite64(Dynautic::A64::VAddr, u64) override {}
+    void MemoryWrite128(Dynautic::A64::VAddr, Dynautic::A64::Vector) override {}
 
     void InterpreterFallback(u64 pc, size_t num_instructions) override {
         // This is never called in practice.
@@ -123,16 +94,15 @@ public:
     TestDynautic() {
         user_config.callbacks = &env;
         user_config.check_halt_on_memory_access = false;
+        user_config.native_memory = true;
     }
 
-    uint64_t RunTest(std::vector<u32>&& instructions, std::array<u8, TestBase::mem_size>& memory) override {
+    u64 RunTest(Function *fnc) override {
         u64 fres;
         std::vector<u64> cache;
 
         // Run twice to test caching
         for (unsigned run = 0; run != 2; ++run) {
-            env.memory.fill(0);
-
             // Configure
             user_config.update_cache = !(user_config.use_cache = user_config.unsafe_optimizations = user_config.fully_static = !cache.empty());
             //user_config.dump_assembly = user_config.fully_static;
@@ -145,19 +115,14 @@ public:
             if (!cache.empty())
                 cpu.LoadCache(cache);
 
-            // Write exit SVC instruction
-            env.MemoryWrite32(exit_addr, 0xd4000081); // svc #4
-            env.MemoryWrite32(exit_addr+4, 0xd65f03c0); // ret
-
-            // Copy instructions to memory
-            for (unsigned addr = exe_base, idx = 0; idx != instructions.size(); addr += 4, ++idx)
-                env.MemoryWrite32(addr, instructions[idx]);
+            // Allocate stack
+            std::vector<u8> stack(0x1024 * 0x1024 * 4 /*4 MB*/);
 
             // Set up registers
             cpu.SetRegister(0, 0xfabd3dd59df77212);
             cpu.SetRegister(30, exit_addr);
-            cpu.SetSP(stack_addr);
-            cpu.SetPC(exe_base);
+            cpu.SetSP(reinterpret_cast<u64>(stack.data()+stack.size()));
+            cpu.SetPC(reinterpret_cast<u64>(fnc));
 
             // Execute
             restart:
@@ -179,7 +144,6 @@ public:
                 fres = cpu.GetRegister(0);
             else if (fres != cpu.GetRegister(0))
                 fres = 0xcac3bad;
-            memory = env.memory;
 
             std::cout << "Dynautic pass #" << std::dec << run << " done after " << duration << "ms!" << std::endl;
         }
