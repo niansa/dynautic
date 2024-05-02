@@ -243,7 +243,7 @@ bool Lifter::InstructionLifter::Run() {
                              && insn.id != AArch64_INS_CSEL
                              && insn.id != AArch64_INS_CCMP;
     if (conditional) {
-        Value *condition = GetNZCVCondition();
+        Value *condition = GetCondition();
         if (!condition)
             return false;
         // Create branch
@@ -367,7 +367,7 @@ bool Lifter::InstructionLifter::Run() {
         } return;
         case AArch64_INS_CSEL: {
             const auto ops = GetOps(3);
-            Value *condition = GetNZCVCondition();
+            Value *condition = GetCondition();
             if (!condition)
                 break;
             p.StoreRegister(rinst, ops[0], rinst.builder->CreateSelect(condition, p.GetRegisterView(rinst, ops[1]), p.GetRegisterView(rinst, ops[2])));

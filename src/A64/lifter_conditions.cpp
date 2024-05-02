@@ -127,7 +127,12 @@ Value *Lifter::InstructionLifter::GetComparisonCondition() {
 }
 
 Value *Lifter::InstructionLifter::GetCondition() {
+    /// This function decides if a NZCV based condition should be emitted or a comparison based one.
+    /// The comparison based one allows for more optimal performance but the NZCV based one is needed
+    /// in some cases.
     if (p.rt_values.nzcv && p.rt_values.comparison.first) {
+        /// This is a way to decide about the use of either NZCV or comparision values without branching.
+        /// Most of the time LLVM is able to optimize away the part of the equation that isn't needed.
         Value *nzcv = p.rt_values.nzcv;
         Value *use_comparison = ToInt1(rinst.builder->CreateAnd(rinst.builder->CreateNot(nzcv), nzcv_used));
         Value *use_nzcv = ToInt1(rinst.builder->CreateAnd(nzcv, nzcv_used));
@@ -154,7 +159,7 @@ void Lifter::InstructionLifter::SetComparison(llvm::Value *a, llvm::Value *b) {
     p.rt_values.dirty_comparison = true;
     // Unset NZCV used flag
     if (p.rt_values.nzcv) {
-        p.rt_values.nzcv = rinst.builder->CreateAnd(rinst.builder->CreateNot(p.rt_values.nzcv), nzcv_used);
+        p.rt_values.nzcv = rinst.builder->CreateAnd(p.rt_values.nzcv, ~nzcv_used);
         p.rt_values.dirty_nzcv = true;
     }
 }
