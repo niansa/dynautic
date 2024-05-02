@@ -10,11 +10,13 @@ using namespace llvm::orc;
 
 namespace Dynautic::A64 {
 enum NZCV : uint8_t {
+    // Right part (NZCV)
     n = 0b1000,
     z = 0b0100,
     c = 0b0010,
     v = 0b0001,
-    nzcv_used = 0b10000
+    // Left part
+    nzcv_used = 0b0001 << 4,
 };
 
 

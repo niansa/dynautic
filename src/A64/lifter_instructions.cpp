@@ -212,7 +212,7 @@ void Lifter::InstructionLifter::DeferCompilation(bool repeat_instruction) {
 #define Handle3OpsNot(func) \
     do { \
         auto ops = GetOps(3); \
-p.StoreRegister(rinst, ops[0], func(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateNot(rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift), rinst.GetType(ops[1].size), false)))); \
+        p.StoreRegister(rinst, ops[0], func(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateNot(rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift), rinst.GetType(ops[1].size), false)))); \
     } while (0)
 
 #define HandleShift(type) \
@@ -241,6 +241,7 @@ bool Lifter::InstructionLifter::Run() {
     BasicBlock *next_block = nullptr;
     const bool conditional = detail.cc != AArch64CC_Invalid
                              && insn.id != AArch64_INS_CSEL
+                             && insn.alias_id != AArch64_INS_ALIAS_CSET
                              && insn.id != AArch64_INS_CCMP;
     if (conditional) {
         Value *condition = GetCondition();
@@ -432,12 +433,6 @@ bool Lifter::InstructionLifter::Run() {
             const auto ops = GetOps(2);
             SetComparison(p.GetRegisterView(rinst, ops[0]), p.GetRegisterView(rinst, ops[1]));
         } return;
-        case AArch64_INS_CCMP: {
-            const auto ops = GetOps(3);
-            Value *imm = rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[2]), rinst.builder->getInt8Ty(), false);
-            SetComparison(p.GetRegisterView(rinst, ops[0]), p.GetRegisterView(rinst, ops[1]));
-            SetNZCVIf(imm, GetComparisonCondition());
-        } return;
         case AArch64_INS_ADR: {
             const auto ops = GetOps(2);
             p.StoreRegister(rinst, ops[0], p.GetRegisterView(rinst, ops[1]));
@@ -581,6 +576,18 @@ bool Lifter::InstructionLifter::Run() {
         case AArch64_INS_RET: {
             //TODO: Should do some optimization here in cases where the return address can be determined at compile time
             p.CreateCall(rinst, insn.address, p.GetRegisterView(rinst, "x30"));
+        } return;
+        // Conditional instruction
+        case AArch64_INS_CCMP: {
+            const auto ops = GetOps(3);
+            Value *imm = rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[2]), rinst.builder->getInt8Ty(), false);
+            SetComparison(p.GetRegisterView(rinst, ops[0]), p.GetRegisterView(rinst, ops[1]));
+            SetNZCVIf(imm, GetComparisonCondition());
+        } return;
+        case AArch64_INS_ALIAS_CSET: {
+            const auto op = GetOps(1)[0];
+            Value *value = rinst.builder->CreateSelect(GetCondition(), ConstantInt::get(rinst.GetType(op.size), 1), ConstantInt::get(rinst.GetType(op.size), 0));
+            p.StoreRegister(rinst, op, value);
         } return;
         // Miscellaneous
         case AArch64_INS_MRS: {
