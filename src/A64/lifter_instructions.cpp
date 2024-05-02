@@ -432,6 +432,12 @@ bool Lifter::InstructionLifter::Run() {
             const auto ops = GetOps(2);
             SetComparison(p.GetRegisterView(rinst, ops[0]), p.GetRegisterView(rinst, ops[1]));
         } return;
+        case AArch64_INS_CCMP: {
+            const auto ops = GetOps(3);
+            Value *imm = rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[2]), rinst.builder->getInt8Ty(), false);
+            SetComparison(p.GetRegisterView(rinst, ops[0]), p.GetRegisterView(rinst, ops[1]));
+            SetNZCVIf(imm, GetComparisonCondition());
+        } return;
         case AArch64_INS_ADR: {
             const auto ops = GetOps(2);
             p.StoreRegister(rinst, ops[0], p.GetRegisterView(rinst, ops[1]));

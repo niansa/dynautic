@@ -245,27 +245,39 @@ int main(int argc, char** argv) {
                       0xd65f03c0  // ret
                   }, unicorn.get());
 
-    dynautic->RunTest("Simple ADR instruction using immediate", {
+    dynautic->RunTest("Simple ADR instruction", {
                       0xd503201f, // nop
                       0x10000020, // adr x0, 4
                       0xd65f03c0  // ret
                   }, unicorn.get());
 
-    dynautic->RunTest("Simple ADRP instruction using immediate", {
+    dynautic->RunTest("Simple ADRP instruction", {
                       0xd503201f, // nop
                       0x90000000, // adrp x0, 4
                       0xd65f03c0  // ret
                   }, unicorn.get());
 
-    dynautic->RunTest("Simple LDRB instruction using immediate", {
+    dynautic->RunTest("Simple LDRB instruction", {
                       0x39400300, // ldrb w0, [x24]
                       0xd65f03c0  // ret
                   }, unicorn.get());
 
-    dynautic->RunTest("Simple FMOV instruction", {
+    dynautic->RunTest("Couple of FMOV instructions", {
                       0x9e670000, // fmov d0, x0
                       0x9e670021, // fmov d1, x1
                       0x9e660020, // fmov x0, d1
+                      0xd65f03c0  // ret
+                  }, unicorn.get());
+
+    dynautic->RunTest("Matching CCMP instruction", {
+                      0xfa421024, // ccmp x1, x2, #0x4, ne
+                      0x9a800020, // csel x0, x1, x0, eq
+                      0xd65f03c0  // ret
+                  }, unicorn.get());
+
+    dynautic->RunTest("Non-matching CCMP instruction", {
+                      0xfa410024, // ccmp x1, x1, #0x4, eq
+                      0x9a801020, // csel x0, x1, x0, ne
                       0xd65f03c0  // ret
                   }, unicorn.get());
 

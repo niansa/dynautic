@@ -153,22 +153,32 @@ Value *Lifter::InstructionLifter::GetCondition() {
 
 void Lifter::InstructionLifter::SetComparison(llvm::Value *a, llvm::Value *b) {
     p.rt_values.comparison = {
-        rinst.builder->CreateIntCast(a, rinst.builder->getInt64Ty(), false),
-        rinst.builder->CreateIntCast(b, rinst.builder->getInt64Ty(), false)
+        rinst.builder->CreateIntCast(a, rinst.builder->getInt64Ty(), false, "comp_first_"),
+        rinst.builder->CreateIntCast(b, rinst.builder->getInt64Ty(), false, "comp_second_")
     };
     p.rt_values.dirty_comparison = true;
     // Unset NZCV used flag
     if (p.rt_values.nzcv) {
-        p.rt_values.nzcv = rinst.builder->CreateAnd(p.rt_values.nzcv, ~nzcv_used);
+        p.rt_values.nzcv = rinst.builder->CreateAnd(p.rt_values.nzcv, ~nzcv_used, "nzcv_");
         p.rt_values.dirty_nzcv = true;
     }
 }
 
-void Lifter::InstructionLifter::SetNZCV(llvm::Value *a) {
-    p.rt_values.nzcv = a;
+void Lifter::InstructionLifter::SetNZCV(llvm::Value *value) {
+    value->setName("nzcv_");
+    p.rt_values.nzcv = value;
     p.rt_values.dirty_nzcv = true;
     // Set NZCV used flag if needed
     if (p.rt_values.comparison.first)
-        p.rt_values.nzcv = rinst.builder->CreateOr(p.rt_values.nzcv, nzcv_used);
+        p.rt_values.nzcv = rinst.builder->CreateOr(p.rt_values.nzcv, nzcv_used, "nzcv_");
+}
+
+void Lifter::InstructionLifter::SetNZCVIf(llvm::Value *value, llvm::Value *condition) {
+    p.rt_values.dirty_nzcv = true;
+    // Set NZCV used flag if needed
+    if (p.rt_values.comparison.first)
+        value = rinst.builder->CreateOr(value, nzcv_used);
+    // Select either old or new value
+    p.rt_values.nzcv = rinst.builder->CreateSelect(condition, value, p.rt_values.nzcv, "nzcv_");
 }
 }
