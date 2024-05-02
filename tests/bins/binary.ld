@@ -10,7 +10,7 @@ PHDRS
 
 SECTIONS
 {
-    . = 0x10;
+    . = 0xe0000;
 
     .start : {
         *(.start .start.*)

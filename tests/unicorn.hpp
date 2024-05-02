@@ -16,7 +16,9 @@ class TestUnicorn final : public TestBase {
     }
 
 public:
-    uint64_t RunTest(std::vector<u32>&& instructions, std::array<u8, TestBase::mem_size>& memory) override {
+    uint64_t RunTest(std::vector<u32>&& instructions, std::array<u8, TestBase::mem_size>& memory, bool no_native_memory) override {
+        (void)no_native_memory;
+
         memory.fill(0);
 
         handle_error(uc_open(UC_ARCH_ARM64, UC_MODE_ARM, &uc));

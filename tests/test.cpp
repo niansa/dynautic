@@ -156,7 +156,7 @@ int main(int argc, char** argv) {
                       0xd65f03c0, // ret
                       0xd2800f60, // mov x0, #123
                       0xd65f03c0  // ret
-                  }, unicorn.get());
+                  }, unicorn.get(), true);
 
     dynautic->RunTest("64bit load instruction pre/post register updating", {
                       0xaa0a03e4, // mov x4, x10
@@ -173,7 +173,7 @@ int main(int argc, char** argv) {
                       0xa9ff8480, // ldp x0, x1, [x4, #-0x8]!
                       0xaa0403e0, // mov x0, x4
                       0xd65f03c0  // ret
-                  }, unicorn.get());
+                  }, unicorn.get(), true);
 
     dynautic->RunTest("64bit store instruction pre/post register updating", {
                       0xaa0a03e4, // mov x4, x10
@@ -191,7 +191,7 @@ int main(int argc, char** argv) {
                       0xa9bf8480, // stp x0, x1, [x4, #-0x8]!
                       0xaa0403e0, // mov x0, x4
                       0xd65f03c0  // ret
-                  }, unicorn.get());
+                  }, unicorn.get(), true);
 
     dynautic->RunTest("32bit load instruction pre/post register updating", {
                       0xaa0a03e4, // mov x4, x10
@@ -206,7 +206,7 @@ int main(int argc, char** argv) {
                       0x29c10480, // ldp w0, w1, [x4, #0x8]!
                       0xaa0403e0, // mov x0, x4
                       0xd65f03c0  // ret
-                  }, unicorn.get());
+                  }, unicorn.get(), true);
 
     dynautic->RunTest("Standard function prologue", {
                       0xa9be7bfd, // stp x29, x30, [sp, #-32]!
@@ -217,7 +217,7 @@ int main(int argc, char** argv) {
                       0x910003fd, // mov x29, sp
                       0xf9000fe0, // str x0, [sp, #24]
                       0xd61f02e0, // br x23
-                  }, unicorn.get());
+                  }, unicorn.get(), true);
 
     dynautic->RunTest("Simple matching conditional jump using cmp instruction", {
                       0xf109603f, // cmp x1, #600

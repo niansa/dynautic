@@ -17,33 +17,33 @@ using u64 = std::uint64_t;
 
 class TestBase {
 public:
-    constexpr static size_t mem_size = 0x80000,
+    constexpr static size_t mem_size = 0xf0000,
                             heap_base = 0x10000,
-                            exe_base = 0x10,
+                            exe_base = 0xe0000,
                             exit_addr = 0x40000,
                             stack_addr = 0x60000;
 
     TestBase() {}
     virtual ~TestBase() {}
 
-    virtual u64 RunTest(std::vector<u32>&& instructions, std::array<u8, TestBase::mem_size>& memory) = 0;
+    virtual u64 RunTest(std::vector<u32>&& instructions, std::array<u8, TestBase::mem_size>& memory, bool no_native_memory = false) = 0;
 
-    void RunTest(std::string_view test_name, std::vector<u32>&& instructions, u64 expected_result, std::array<u8, TestBase::mem_size>& memory) {
+    void RunTest(std::string_view test_name, std::vector<u32>&& instructions, u64 expected_result, std::array<u8, TestBase::mem_size>& memory, bool no_native_memory = false) {
         std::cout << "Running test: " << test_name << "..." << std::endl;
-        const auto result = RunTest(std::move(instructions), memory);
+        const auto result = RunTest(std::move(instructions), memory, no_native_memory);
         if (result != expected_result)
             std::cerr << std::hex << "Test failed! Function result: 0x" << result << " (expected 0x" << expected_result << ")!\n" << std::endl;
         else
             std::cout << std::hex << "Function result matches (0x" << result << ").\n" << std::endl;
     }
 
-    void RunTest(std::string_view test_name, std::vector<u32>&& instructions, TestBase *validator) {
+    void RunTest(std::string_view test_name, std::vector<u32>&& instructions, TestBase *validator, bool no_native_memory = false) {
         std::vector<u32> instructions_copy = instructions;
         std::array<u8, TestBase::mem_size> expected_memory;
         std::cout << "Getting reference value: ";
-        const u64 expected_result = validator->RunTest(std::move(instructions_copy), expected_memory);
+        const u64 expected_result = validator->RunTest(std::move(instructions_copy), expected_memory, no_native_memory);
         std::array<u8, TestBase::mem_size> memory;
-        RunTest(test_name, std::move(instructions), expected_result, memory);
+        RunTest(test_name, std::move(instructions), expected_result, memory, no_native_memory);
         std::fill(memory.begin()+exit_addr, memory.begin()+exit_addr+16, 0);
         std::fill(expected_memory.begin()+exit_addr, expected_memory.begin()+exit_addr+16, 0);
         if (memory != expected_memory) {

@@ -3,6 +3,8 @@
 #include "common.hpp"
 
 #include <stdexcept>
+#include <cstring>
+#include <sys/mman.h>
 #include <dynautic/A64.hpp>
 
 
@@ -123,20 +125,20 @@ public:
     TestDynautic() {
         user_config.callbacks = &env;
         user_config.check_halt_on_memory_access = false;
+        mmap(reinterpret_cast<void*>(exe_base), 1024*1024/*1 MB*/, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
     }
 
-    uint64_t RunTest(std::vector<u32>&& instructions, std::array<u8, TestBase::mem_size>& memory) override {
+    uint64_t RunTest(std::vector<u32>&& instructions, std::array<u8, TestBase::mem_size>& memory, bool no_native_memory) override {
         u64 fres;
         std::vector<u64> cache;
 
         // Run twice to test caching
-        for (unsigned run = 0; run != 2; ++run) {
+        for (unsigned run = 0; run != (no_native_memory?2:3); ++run) {
             env.memory.fill(0);
 
             // Configure
             user_config.update_cache = !(user_config.use_cache = user_config.unsafe_optimizations = user_config.fully_static = !cache.empty());
             user_config.native_memory = run == 2;
-            //user_config.dump_assembly = user_config.fully_static;
 
             // Create runtime
             Dynautic::A64::Runtime cpu(user_config);
@@ -151,13 +153,19 @@ public:
             env.MemoryWrite32(exit_addr+4, 0xd65f03c0); // ret
 
             // Copy instructions to memory
-            for (unsigned addr = exe_base, idx = 0; idx != instructions.size(); addr += 4, ++idx)
+            for (unsigned addr = exe_base, idx = 0; idx != instructions.size(); addr += 4, ++idx) {
                 env.MemoryWrite32(addr, instructions[idx]);
-
-            // Set up stack
-            Dynautic::A64::VAddr stack_addr = this->stack_addr;
+            }
             if (user_config.native_memory)
+                memcpy(reinterpret_cast<void*>(exe_base), instructions.data(), instructions.size()*4);
+
+            // Set up heap and stack
+            Dynautic::A64::VAddr stack_addr = this->stack_addr;
+            Dynautic::A64::VAddr heap_base = this->heap_base;
+            if (user_config.native_memory) {
                 stack_addr = reinterpret_cast<Dynautic::A64::VAddr>(&env.memory[stack_addr]);
+                heap_base = reinterpret_cast<Dynautic::A64::VAddr>(&env.memory[heap_base]);
+            }
 
             // Set up registers
             cpu.SetRegister(0, 0xfabd3dd59df77212);
