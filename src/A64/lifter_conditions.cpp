@@ -92,8 +92,7 @@ Value *Lifter::InstructionLifter::GetComparisonCondition() {
     } break;
     case AArch64CC_VC: invert = true; [[fallthrough]];
     case AArch64CC_VS: {
-        Type *i64t = rinst.builder->getInt64Ty();
-        Value *result = rinst.builder->CreateIntrinsic(Intrinsic::ssub_with_overflow, {i64t, i64t}, {left, right});
+        Value *result = rinst.builder->CreateIntrinsic(Intrinsic::ssub_with_overflow, {left->getType(), right->getType()}, {left, right});
         condition = rinst.builder->CreateExtractValue(result, 1);
         if (invert)
             rinst.builder->CreateNot(condition);
@@ -153,10 +152,9 @@ Value *Lifter::InstructionLifter::GetCondition() {
 }
 
 void Lifter::InstructionLifter::SetComparison(llvm::Value *a, llvm::Value *b) {
-    p.rt_values.comparison = {
-        rinst.builder->CreateIntCast(a, rinst.builder->getInt64Ty(), false, "comp_first_"),
-        rinst.builder->CreateIntCast(b, rinst.builder->getInt64Ty(), false, "comp_second_")
-    };
+    a->setName("comp_first_");
+    b->setName("comp_second_");
+    p.rt_values.comparison = {a, b};
     p.rt_values.dirty_comparison = true;
     // Unset NZCV used flag
     if (p.rt_values.nzcv) {
