@@ -36,12 +36,19 @@ void Lifter::CreateRegisterRestore(Instance& rinst) {
 
     // Fill in comparisation
     if (!rt.conf.HasOptimization(OptimizationFlag::Unsafe_ScopedCMP)) {
-        rt_values.comparison.first = CreateLoadFromPtr(rinst, &rt.comparison.first, rinst.builder->getInt64Ty(), "comp_left_");
-        rt_values.comparison.second = CreateLoadFromPtr(rinst, &rt.comparison.second, rinst.builder->getInt64Ty(), "comp_right_");
+        rt_values.comparison.first = CreateLoadFromPtr(rinst, &rt.comparison.first, rinst.builder->getInt64Ty(), "comp_first_");
+        rt_values.comparison.second = CreateLoadFromPtr(rinst, &rt.comparison.second, rinst.builder->getInt64Ty(), "comp_second_");
         rt_values.dirty_comparison = false;
     } else {
-        rt_values.comparison.first = nullptr;
-        rt_values.comparison.second = nullptr;
+        rt_values.comparison = {nullptr, nullptr};
+    }
+
+    // Fill in comparisation
+    if (!rt.conf.HasOptimization(OptimizationFlag::Unsafe_ScopedCMP)) {
+        rt_values.nzcv = CreateLoadFromPtr(rinst, &rt.nzcv, rinst.builder->getInt8Ty(), "nzcv_");
+        rt_values.dirty_nzcv = false;
+    } else {
+        rt_values.nzcv = nullptr;
     }
 }
 
@@ -74,6 +81,12 @@ void Lifter::CreateRegisterSave(Instance& rinst) {
         CreateStoreToPtr(rinst, &rt.comparison.second, rt_values.comparison.second);
     }
     rt_values.dirty_comparison = false;
+
+    // Write out NZCV
+    if (rt_values.dirty_nzcv && !rt.conf.HasOptimization(OptimizationFlag::Unsafe_ScopedCMP)) {
+        CreateStoreToPtr(rinst, &rt.nzcv, rt_values.nzcv);
+    }
+    rt_values.dirty_nzcv = false;
 }
 
 void Lifter::CreatePCSave(Instance& rinst) {

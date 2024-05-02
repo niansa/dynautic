@@ -29,6 +29,7 @@ add_library(dynautic STATIC
     src/A64/lifter_registers.cpp
     src/A64/lifter_shifts.cpp
     src/A64/lifter_glue_emitters.cpp
+    src/A64/lifter_conditions.cpp
     src/A64/lifter_trampolines.cpp
 )
 target_include_directories(dynautic PRIVATE ${LLVM_INCLUDE_DIRS} PUBLIC include)

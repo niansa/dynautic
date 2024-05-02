@@ -30,7 +30,12 @@ class Lifter::InstructionLifter {
 
     std::array<RegisterDescription, GetOps_max_op_count> GetOps(unsigned op_count);
 
+    llvm::Value *ToInt1(llvm::Value *, bool invert = false);
+    llvm::Value *GetNZCVCondition();
+    llvm::Value *GetComparisonCondition();
     llvm::Value *GetCondition();
+    void SetComparison(llvm::Value *a, llvm::Value *b);
+    void SetNZCV(llvm::Value *a);
 
     void CreateCall(unsigned op_idx = 0);
     llvm::BasicBlock *PrepareBranch(unsigned op_idx = 0);

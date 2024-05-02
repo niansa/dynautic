@@ -1,3 +1,4 @@
+#include "lifter.hpp"
 #include "lifter_instructions.hpp"
 #include "lifter_instance.hpp"
 #include "runtime.hpp"
@@ -96,82 +97,6 @@ std::array<RegisterDescription, Lifter::InstructionLifter::GetOps_max_op_count> 
         }
     }
     return regs;
-}
-
-Value *Lifter::InstructionLifter::GetCondition() {
-    Value *condition = nullptr;
-    auto [left, right] = p.rt_values.comparison;
-    if (!left || !right) {
-        DYNAUTIC_ASSERT(!"Unknown comparison values");
-        if (rinst.rt.conf.unsafe_unexpected_situation_handling) {
-            left = rinst.builder->getInt64(0);
-            right = rinst.builder->getInt32(0);
-        } else {
-            p.CreateExceptionTrampoline(rinst, Exception::UnpredictableInstruction);
-            return nullptr;
-        }
-    }
-    // Check conditions
-    switch (detail.cc) {
-    case AArch64CC_EQ: {
-        condition = rinst.builder->CreateICmpEQ(left, right);
-    } break;
-    case AArch64CC_NE: {
-        condition = rinst.builder->CreateICmpNE(left, right);
-    } break;
-    case AArch64CC_HS: {
-        condition = rinst.builder->CreateICmpUGE(left, right);
-    } break;
-    case AArch64CC_LO: {
-        condition = rinst.builder->CreateICmpULT(left, right);
-    } break;
-    case AArch64CC_MI: {
-        condition = rinst.builder->CreateICmpSLT(left, ConstantInt::get(left->getType(), 0, true));
-    } break;
-    case AArch64CC_PL: {
-        condition = rinst.builder->CreateICmpSGE(left, ConstantInt::get(left->getType(), 0, true));
-    } break;
-    case AArch64CC_VC: // TODO: Implement
-    case AArch64CC_VS: { // TODO: Implement{
-        DYNAUTIC_ASSERT(!"Comparison code not implemented");
-        if (rinst.rt.conf.unsafe_unexpected_situation_handling)
-            condition = rinst.builder->getInt1(false);
-        else
-            p.CreateExceptionTrampoline(rinst, Exception::UnpredictableInstruction);
-    } break;
-    case AArch64CC_HI: {
-        condition = rinst.builder->CreateICmpUGT(left, right);
-    } break;
-    case AArch64CC_LS: {
-        condition = rinst.builder->CreateICmpULE(left, right);
-    } break;
-    case AArch64CC_GE: {
-        condition = rinst.builder->CreateICmpSGE(left, right);
-    } break;
-    case AArch64CC_LT: {
-        condition = rinst.builder->CreateICmpSLT(left, right);
-    } break;
-    case AArch64CC_GT: {
-        condition = rinst.builder->CreateICmpSGT(left, right);
-    } break;
-    case AArch64CC_LE: {
-        condition = rinst.builder->CreateICmpSLE(left, right);
-    } break;
-    case AArch64CC_AL: {
-        condition = rinst.builder->getInt1(true);
-    } break;
-    case AArch64CC_NV: {
-        condition = rinst.builder->getInt1(false);
-    } break;
-    default: {
-        DYNAUTIC_ASSERT(!"Unknown comparison code");
-        if (rinst.rt.conf.unsafe_unexpected_situation_handling)
-            condition = rinst.builder->getInt1(false);
-        else
-            p.CreateExceptionTrampoline(rinst, Exception::UnpredictableInstruction);
-    }
-    }
-    return condition;
 }
 
 void Lifter::InstructionLifter::CreateCall(unsigned op_idx) {
@@ -318,7 +243,7 @@ bool Lifter::InstructionLifter::Run() {
                              && insn.id != AArch64_INS_CSEL
                              && insn.id != AArch64_INS_CCMP;
     if (conditional) {
-        Value *condition = GetCondition();
+        Value *condition = GetNZCVCondition();
         if (!condition)
             return false;
         // Create branch
@@ -442,7 +367,7 @@ bool Lifter::InstructionLifter::Run() {
         } return;
         case AArch64_INS_CSEL: {
             const auto ops = GetOps(3);
-            Value *condition = GetCondition();
+            Value *condition = GetNZCVCondition();
             if (!condition)
                 break;
             p.StoreRegister(rinst, ops[0], rinst.builder->CreateSelect(condition, p.GetRegisterView(rinst, ops[1]), p.GetRegisterView(rinst, ops[2])));
@@ -455,8 +380,10 @@ bool Lifter::InstructionLifter::Run() {
         case AArch64_INS_ALIAS_SUBS:
         case AArch64_INS_SUBS: {
             const auto ops = GetOps(3);
-            p.rt_values.comparison = {p.GetRegisterView(rinst, ops[1]), p.GetRegisterView(rinst, ops[2])};
-            p.rt_values.dirty_comparison = true;
+            Value *left = p.GetRegisterView(rinst, ops[1]);
+            Value *right = p.PerformShift(rinst, rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[2]), rinst.GetType(ops[1].size), false), shift_type, shift);
+            SetComparison(left, right);
+            p.StoreRegister(rinst, ops[0], rinst.builder->CreateSub(left, right));
         } [[fallthrough]];
         case AArch64_INS_ALIAS_SUB:
         case AArch64_INS_SUB: {
@@ -503,8 +430,7 @@ bool Lifter::InstructionLifter::Run() {
         } return;
         case AArch64_INS_ALIAS_CMP: {
             const auto ops = GetOps(2);
-            p.rt_values.comparison = {p.GetRegisterView(rinst, ops[0]), p.GetRegisterView(rinst, ops[1])};
-            p.rt_values.dirty_comparison = true;
+            SetComparison(p.GetRegisterView(rinst, ops[0]), p.GetRegisterView(rinst, ops[1]));
         } return;
         case AArch64_INS_ADR: {
             const auto ops = GetOps(2);

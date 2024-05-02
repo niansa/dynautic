@@ -82,6 +82,8 @@ class Lifter {
         bool dirty_stack_pointer{};
         std::pair<llvm::Value *, llvm::Value *> comparison;
         bool dirty_comparison{};
+        llvm::Value * nzcv;
+        bool dirty_nzcv{};
     } rt_values;
 
     void ResetScratchRegisters();

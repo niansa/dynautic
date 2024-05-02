@@ -55,6 +55,7 @@ struct Runtime::Impl {
     std::array<uint64_t, 31> registers{};
     std::array<Vector, 32> vectors{};
     std::pair<uint64_t, uint64_t> comparison{};
+    uint8_t nzcv{};
 
     Lifter raiser;
     UserConfig conf;
