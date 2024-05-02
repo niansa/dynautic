@@ -70,6 +70,7 @@ Value *Lifter::InstructionLifter::GetComparisonCondition() {
     Value *condition = nullptr;
     auto [left, right] = p.rt_values.comparison;
     // Check conditions
+    bool invert = false;
     switch (detail.cc) {
     case AArch64CC_EQ: {
         condition = rinst.builder->CreateICmpEQ(left, right);
@@ -89,13 +90,13 @@ Value *Lifter::InstructionLifter::GetComparisonCondition() {
     case AArch64CC_PL: {
         condition = rinst.builder->CreateICmpSGE(left, ConstantInt::get(left->getType(), 0, true));
     } break;
-    case AArch64CC_VC: // TODO: Implement
-    case AArch64CC_VS: { // TODO: Implement{
-        DYNAUTIC_ASSERT(!"Comparison code not implemented");
-        if (rinst.rt.conf.unsafe_unexpected_situation_handling)
-            condition = rinst.builder->getInt1(false);
-        else
-            p.CreateExceptionTrampoline(rinst, Exception::UnpredictableInstruction);
+    case AArch64CC_VC: invert = true; [[fallthrough]];
+    case AArch64CC_VS: {
+        Type *i64t = rinst.builder->getInt64Ty();
+        Value *result = rinst.builder->CreateIntrinsic(Intrinsic::ssub_with_overflow, {i64t, i64t}, {left, right});
+        condition = rinst.builder->CreateExtractValue(result, 1);
+        if (invert)
+            rinst.builder->CreateNot(condition);
     } break;
     case AArch64CC_HI: {
         condition = rinst.builder->CreateICmpUGT(left, right);
