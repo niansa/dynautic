@@ -154,8 +154,6 @@ Value *Lifter::InstructionLifter::GetCondition() {
 }
 
 void Lifter::InstructionLifter::SetComparison(llvm::Value *a, llvm::Value *b) {
-    a->setName("comp_first_");
-    b->setName("comp_second_");
     p.rt_values.comparison = {a, b};
     p.rt_values.dirty_comparison = true;
     // Unset NZCV used flag
@@ -166,12 +164,43 @@ void Lifter::InstructionLifter::SetComparison(llvm::Value *a, llvm::Value *b) {
 }
 
 void Lifter::InstructionLifter::SetNZCV(llvm::Value *value) {
-    value->setName("nzcv_");
     p.rt_values.nzcv = value;
     p.rt_values.dirty_nzcv = true;
     // Set NZCV used flag if needed
     if (p.rt_values.comparison.first)
         p.rt_values.nzcv = rinst.builder->CreateOr(p.rt_values.nzcv, nzcv_used, "nzcv_");
+}
+
+void Lifter::InstructionLifter::SetNZFromInt(llvm::Value *value) {
+    llvm::Value *zero = ConstantInt::get(value->getType(), 0);
+    SetNZCV(
+        GetN(rinst.builder->CreateICmpSLT(value, zero)),
+        GetZ(rinst.builder->CreateICmpEQ(value, zero)));
+}
+
+llvm::Value *Lifter::InstructionLifter::GetN(llvm::Value *value) {
+    return rinst.builder->CreateSelect(value, rinst.builder->getInt8(n), rinst.builder->getInt8(0));
+}
+
+llvm::Value *Lifter::InstructionLifter::GetZ(llvm::Value *value) {
+    return rinst.builder->CreateSelect(value, rinst.builder->getInt8(z), rinst.builder->getInt8(0));
+}
+
+llvm::Value *Lifter::InstructionLifter::GetC(llvm::Value *value) {
+    return rinst.builder->CreateSelect(value, rinst.builder->getInt8(c), rinst.builder->getInt8(0));
+}
+
+llvm::Value *Lifter::InstructionLifter::GetV(llvm::Value *value) {
+    return rinst.builder->CreateSelect(value, rinst.builder->getInt8(v), rinst.builder->getInt8(0));
+}
+
+void Lifter::InstructionLifter::SetNZCV(llvm::Value *n, llvm::Value *z, llvm::Value *c, llvm::Value *v) {
+    Value *value = rinst.builder->CreateOr(n, z);
+    if (c)
+        value = rinst.builder->CreateOr(value, c);
+    if (v)
+        value = rinst.builder->CreateOr(value, v);
+    SetNZCV(value);
 }
 
 void Lifter::InstructionLifter::SetNZCVIf(llvm::Value *value, llvm::Value *condition) {

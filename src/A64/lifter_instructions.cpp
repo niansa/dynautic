@@ -329,6 +329,13 @@ bool Lifter::InstructionLifter::Run() {
         case AArch64_INS_BIC: {
             Handle3OpsNot(rinst.builder->CreateAnd);
         } return;
+        case AArch64_INS_ALIAS_BICS:
+        case AArch64_INS_BICS: {
+            auto ops = GetOps(3);
+            Value *result = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateNot(rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift), rinst.GetType(ops[1].size), false)));
+            p.StoreRegister(rinst, ops[0], result);
+            SetNZFromInt(result);
+        } return;
         case AArch64_INS_ALIAS_ORR:
         case AArch64_INS_ORR: {
             Handle3Ops(rinst.builder->CreateOr);

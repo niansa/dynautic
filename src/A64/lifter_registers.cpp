@@ -90,9 +90,12 @@ RegisterDescription Lifter::AllocateScratchRegister(bool as_word) {
             return {idx, as_word};
 
     DYNAUTIC_ASSERT(!"Out of scratch registers");
+    return "xzr";
 }
 
 Value *&Lifter::GetRawRegister(RegisterDescription desc, bool allow_store_to) {
+    DYNAUTIC_ASSERT(!desc.IsZero());
+
     switch (desc.type) {
     case RegisterDescription::Type::scratch: return rt_values.scratch_registers[desc.idx];
     case RegisterDescription::Type::general: {
@@ -149,6 +152,9 @@ Value *Lifter::StoreRegister(Instance& rinst, RegisterDescription desc, llvm::Va
             CreateExceptionTrampoline(rinst, Exception::UnpredictableInstruction);
     }
 
+    // Handle zero register
+    if (desc.IsZero())
+        return ConstantInt::get(rinst.GetType(desc.size), 0);
     // Get real register from list
     Value *&fres = GetRawRegister(desc, true);
     // Apply shift to value
@@ -161,6 +167,10 @@ Value *Lifter::StoreRegister(Instance& rinst, RegisterDescription desc, llvm::Va
 Value *Lifter::StoreRegister16(Instance& rinst, RegisterDescription desc, uint16_t value, bool keep, aarch64_shifter shift_type, uint8_t shift) {
     DYNAUTIC_ASSERT(desc.size != RegisterDescription::Size::quad);
 
+    // Handle zero register
+    if (desc.IsZero())
+        return ConstantInt::get(rinst.GetType(desc.size), 0);
+    // Get real register from list
     Value *&fres = GetRawRegister(desc, true);
     if (keep) {
         // Mask out existing bits

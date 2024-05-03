@@ -36,6 +36,12 @@ class Lifter::InstructionLifter {
     llvm::Value *GetCondition();
     void SetComparison(llvm::Value *a, llvm::Value *b);
     void SetNZCV(llvm::Value *value);
+    void SetNZFromInt(llvm::Value *value);
+    llvm::Value *GetN(llvm::Value *value);
+    llvm::Value *GetZ(llvm::Value *value);
+    llvm::Value *GetC(llvm::Value *value);
+    llvm::Value *GetV(llvm::Value *value);
+    void SetNZCV(llvm::Value *n, llvm::Value *z, llvm::Value *c = nullptr, llvm::Value *v = nullptr);
     void SetNZCVIf(llvm::Value *value, llvm::Value *condition);
 
     void CreateCall(unsigned op_idx = 0);
