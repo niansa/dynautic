@@ -585,9 +585,7 @@ bool Lifter::InstructionLifter::Run() {
             SetNZCVIf(imm, GetComparisonCondition());
         } return;
         case AArch64_INS_ALIAS_CSET: {
-            const auto op = GetOps(1)[0];
-            Value *value = rinst.builder->CreateSelect(GetCondition(), ConstantInt::get(rinst.GetType(op.size), 1), ConstantInt::get(rinst.GetType(op.size), 0));
-            p.StoreRegister(rinst, op, value);
+            p.StoreRegister(rinst, GetOps(1)[0], GetCondition());
         } return;
         // Miscellaneous
         case AArch64_INS_MRS: {
