@@ -9,7 +9,7 @@
 
 
 
-class MyEnvironment final : public Dynautic::A64::UserCallbacks {
+class DynauticEnv final : public Dynautic::A64::UserCallbacks {
 public:
     using u128 = Dynautic::A64::Vector;
 
@@ -118,7 +118,7 @@ public:
 
 
 class TestDynautic final : public TestBase {
-    MyEnvironment env;
+    DynauticEnv env;
     Dynautic::A64::UserConfig user_config;
 
 public:
@@ -179,15 +179,15 @@ public:
             cpu.SetPC(exe_base);
 
             // Execute
-            restart:
             common::Timer timer;
+            restart:
             const auto halt_reason = cpu.Run();
-            const auto duration = timer.get();
             switch (halt_reason) {
             case Dynautic::HaltReason::UserDefined4: break;
             case Dynautic::HaltReason::UserDefined3: cpu.SetPC(cpu.GetPC()+4); goto restart;
             default: throw std::runtime_error("Dynautic error: Unexpected halt reasons: "+std::to_string(static_cast<uint32_t>(halt_reason)));
             }
+            const auto duration = timer.get();
 
             // Save cache
             if (cache.empty())

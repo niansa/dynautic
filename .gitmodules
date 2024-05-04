@@ -4,3 +4,6 @@
 [submodule "cppharden"]
 	path = cppharden
 	url = https://gitlab.com/niansa/cppharden.git
+[submodule "tests/dynarmic"]
+	path = tests/dynarmic
+	url = https://github.com/yuzu-mirror/dynarmic.git

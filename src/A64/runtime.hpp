@@ -63,8 +63,6 @@ struct Runtime::Impl {
 
     std::unique_ptr<llvm::orc::LLJIT> jit;
 
-    bool queued_cache_clear = false;
-
     Impl(UserConfig, Runtime *);
 
     bool IsOk() const {

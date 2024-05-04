@@ -99,10 +99,13 @@ void Runtime::Impl::UpdateExecutionState() {
 }
 
 void Runtime::Impl::ClearCache() {
+    if (executing) {
+        parent->HaltExecution(HaltReason::CacheInvalidation);
+        return;
+    }
     cache.Reset();
     exc.Destroy();
     CreateJit();
-    queued_cache_clear = false;
 }
 
 std::uint8_t Runtime::Impl::MemoryRead8(Runtime::Impl& self, VAddr vaddr) {
@@ -176,7 +179,7 @@ HaltReason Runtime::Run() {
 
     impl->executing = false;
 
-    if (impl->queued_cache_clear)
+    if (Has(impl->halt_reason, HaltReason::CacheInvalidation))
         impl->ClearCache();
 
     return impl->halt_reason;
@@ -194,10 +197,7 @@ void Runtime::Reset() {
 }
 
 void Runtime::ClearCache() {
-    if (impl->executing)
-        impl->queued_cache_clear = true;
-    else
-        impl->ClearCache();
+    impl->ClearCache();
 }
 
 void Runtime::HaltExecution(HaltReason hr) {
