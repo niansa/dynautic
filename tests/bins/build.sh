@@ -9,3 +9,5 @@ for source in *.c *.s; do
         rm -f "$source".elf
     done
 done
+
+rm brainfuck.c-O0.bin primes.c-O0.bin

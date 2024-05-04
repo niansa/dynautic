@@ -10,7 +10,7 @@ unsigned long is_prime_cpu(unsigned long num) {
 __attribute__((section(".start")))
 unsigned long _start() {
     unsigned long fres = 0;
-    for (unsigned long it = 2; it != 10000; ++it)
+    for (unsigned long it = 2; it != 1000000; ++it)
         fres += is_prime_cpu(it);
     return fres;
 }
