@@ -35,7 +35,9 @@ class Lifter::InstructionLifter {
     llvm::Value *GetComparisonCondition();
     llvm::Value *GetCondition();
     void SetComparison(llvm::Value *a, llvm::Value *b);
-    void SetNZCV(llvm::Value *value);
+    llvm::Value *GetNZCV();
+    std::pair<llvm::Value *, llvm::Value *> GetComparison();
+    void SetNZCV(llvm::Value *value, bool no_mark_used = false);
     void SetNZFromInt(llvm::Value *value);
     llvm::Value *GetN(llvm::Value *value);
     llvm::Value *GetZ(llvm::Value *value);

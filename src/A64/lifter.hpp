@@ -75,21 +75,17 @@ class Lifter {
     struct RuntimeValues {
         std::array<llvm::Value *, 4> scratch_registers;
         std::array<llvm::Value *, 31> registers;
-        std::array<bool, 31> dirty_registers;
         std::array<llvm::Value *, 32> vectors;
-        std::array<bool, 32> dirty_vectors;
         llvm::Value *stack_pointer;
-        bool dirty_stack_pointer{};
         std::pair<llvm::Value *, llvm::Value *> comparison;
-        bool dirty_comparison{};
         llvm::Value * nzcv;
-        bool dirty_nzcv{};
     } rt_values;
 
     void ResetScratchRegisters();
     RegisterDescription AllocateScratchRegister(bool as_word);
 
-    llvm::Value *&GetRawRegister(RegisterDescription, bool allowStoreTo);
+    llvm::Value *GetRawRegister(RegisterDescription);
+    llvm::Value *&GetRawScratchRegister(RegisterDescription);
     llvm::Value *GetRegisterView(Instance&, RegisterDescription);
     llvm::Value *StoreRegister(Instance&, RegisterDescription, llvm::Value *, aarch64_shifter shift_type = AArch64_SFT_INVALID, uint8_t shift = 0);
     llvm::Value *StoreRegister16(Instance&, RegisterDescription, uint16_t value, bool keep, aarch64_shifter shift_type = AArch64_SFT_INVALID, uint8_t shift = 0);
@@ -102,6 +98,8 @@ class Lifter {
     void CreateRegisterSave(Instance&);
     void CreatePCSave(Instance&);
 
+    static llvm::Value *CreateNewRegisterFromPtr(Instance& rinst, void *, llvm::Type *type, const llvm::Twine& name = "");
+    static void CreateStoreRegisterToPtr(Instance& rinst, void *, llvm::Value *alloca, llvm::Type *type);
     static llvm::Value *CreateLoadFromPtr(Instance& rinst, void *, llvm::Type *type, const llvm::Twine& name = "");
     static void CreateStoreToPtr(Instance& rinst, void *, llvm::Value *value);
 

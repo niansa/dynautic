@@ -93,26 +93,14 @@ RegisterDescription Lifter::AllocateScratchRegister(bool as_word) {
     return "xzr";
 }
 
-Value *&Lifter::GetRawRegister(RegisterDescription desc, bool allow_store_to) {
+Value *Lifter::GetRawRegister(RegisterDescription desc) {
     DYNAUTIC_ASSERT(!desc.IsZero());
 
     switch (desc.type) {
     case RegisterDescription::Type::scratch: return rt_values.scratch_registers[desc.idx];
-    case RegisterDescription::Type::general: {
-        if (allow_store_to)
-            rt_values.dirty_registers[desc.idx] = true;
-        return rt_values.registers[desc.idx];
-    } break;
-    case RegisterDescription::Type::vector: {
-        if (allow_store_to)
-            rt_values.dirty_vectors[desc.idx] = true;
-        return rt_values.vectors[desc.idx];
-    } break;
-    case RegisterDescription::Type::stack_pointer: {
-        if (allow_store_to)
-            rt_values.dirty_stack_pointer = true;
-        return rt_values.stack_pointer;
-    }
+    case RegisterDescription::Type::general: return rt_values.registers[desc.idx];
+    case RegisterDescription::Type::vector: return rt_values.vectors[desc.idx];
+    case RegisterDescription::Type::stack_pointer: return rt_values.stack_pointer;
     default: {
         DYNAUTIC_ASSERT(!"Unsupported register type");
         // We create a null pointer instead, hoping it's not going to be used
@@ -121,6 +109,11 @@ Value *&Lifter::GetRawRegister(RegisterDescription desc, bool allow_store_to) {
         return invalid_value;
     }
     }
+}
+
+llvm::Value *&Lifter::GetRawScratchRegister(RegisterDescription desc) {
+    DYNAUTIC_ASSERT(desc.type == RegisterDescription::Type::scratch);
+    return rt_values.scratch_registers[desc.idx];
 }
 
 Value *Lifter::GetRegisterView(Instance& rinst, RegisterDescription desc) {
@@ -135,12 +128,14 @@ Value *Lifter::GetRegisterView(Instance& rinst, RegisterDescription desc) {
     // Handle zero register
     if (desc.IsZero())
         return ConstantInt::get(rinst.GetType(desc.size), 0);
-    // Get real register from list
-    Value *fres = GetRawRegister(desc, false);
+    // Load from register
+    Value *fres;
+    if (desc.type != RegisterDescription::Type::scratch)
+        fres = rinst.builder->CreateLoad(rinst.GetType(desc.size), GetRawRegister(desc));
+    else
+        fres = GetRawScratchRegister(desc);
     // Truncate as needed
-    fres = rinst.builder->CreateTrunc(fres, rinst.GetType(desc.size));
-    return fres;
-
+    return rinst.builder->CreateTrunc(fres, rinst.GetType(desc.size));
 }
 
 Value *Lifter::StoreRegister(Instance& rinst, RegisterDescription desc, llvm::Value *value, aarch64_shifter shift_type, uint8_t shift) {
@@ -155,26 +150,37 @@ Value *Lifter::StoreRegister(Instance& rinst, RegisterDescription desc, llvm::Va
     // Handle zero register
     if (desc.IsZero())
         return ConstantInt::get(rinst.GetType(desc.size), 0);
-    // Get real register from list
-    Value *&fres = GetRawRegister(desc, true);
     // Apply shift to value
     value = PerformShift(rinst, value, shift_type, shift);
-    // Set value after casting to full size
-    fres = rinst.builder->CreateIntCast(value, rinst.GetType(desc.GetFullTypeSize()), false, desc.GetName());
-    return fres;
+    // Cast to full size
+    value = rinst.builder->CreateIntCast(value, rinst.GetType(desc.GetFullTypeSize()), false, desc.GetName());
+    // Store to register
+    if (desc.type != RegisterDescription::Type::scratch)
+        rinst.builder->CreateStore(value, GetRawRegister(desc));
+    else
+        GetRawScratchRegister(desc) = value;
+    return value;
 }
 
 Value *Lifter::StoreRegister16(Instance& rinst, RegisterDescription desc, uint16_t value, bool keep, aarch64_shifter shift_type, uint8_t shift) {
     DYNAUTIC_ASSERT(desc.size != RegisterDescription::Size::quad);
+    DYNAUTIC_ASSERT(desc.type != RegisterDescription::Type::scratch);
 
+    // Get data type
+    Type *type = rinst.GetType(desc.size);
     // Handle zero register
     if (desc.IsZero())
-        return ConstantInt::get(rinst.GetType(desc.size), 0);
-    // Get real register from list
-    Value *&fres = GetRawRegister(desc, true);
+        return ConstantInt::get(type, 0);
+    // Get register
+    Value *reg = GetRawRegister(desc);
+    Value *fres;
     if (keep) {
+        // Get full data type
+        Type *full_type = rinst.GetType(desc.GetFullTypeSize());
+        // Load register value
+        fres = rinst.builder->CreateLoad(full_type, reg);
         // Mask out existing bits
-        Value *mask = rinst.builder->getInt64(~(PerformShift(0xffff, desc.size, shift_type, shift)));
+        Value *mask = ConstantInt::get(full_type, ~(PerformShift(0xffff, desc.size, shift_type, shift)));
         fres = rinst.builder->CreateAnd(fres, mask);
         // Merge shifted value into result
         fres = rinst.builder->CreateOr(fres, PerformShift(value, desc.size, shift_type, shift));
@@ -184,6 +190,8 @@ Value *Lifter::StoreRegister16(Instance& rinst, RegisterDescription desc, uint16
     } else {
         fres = rinst.builder->getInt64(PerformShift(value, desc.size, shift_type, shift));
     }
+    // Store back value
+    rinst.builder->CreateStore(fres, reg);
     fres->setName(desc.GetName());
     return fres;
 }

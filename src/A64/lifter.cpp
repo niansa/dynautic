@@ -73,6 +73,7 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
         // Create entry block and branch
         Instance rinst(rt, context.get(), module.get(), function_name);
         rinst.UseBasicBlock(rinst.CreateBasicBlock("EntryBlock"));
+        CreateRegisterRestore(rinst);
         rinst.builder->CreateBr(rinst.QueueBranch(addr, "BranchAtEntryBlock"));
 
         // Lift each leaf until none are left
@@ -138,8 +139,6 @@ void Lifter::DeferLift(VAddr addr) {
 void Lifter::LiftLeaf(Instance& rinst, VAddr addr) {
     VAddr last_addr = addr;
     std::vector<VAddr> noexec_addrs;
-
-    CreateRegisterRestore(rinst);
 
     // Lift instructions in blocks
     std::array<uint8_t, 0x100> block;
