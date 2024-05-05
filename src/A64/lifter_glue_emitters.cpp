@@ -19,64 +19,56 @@ using namespace llvm::orc;
 namespace Dynautic::A64 {
 void Lifter::CreateRegisterRestore(Instance& rinst) {
     // Fill in stack pointer
-    rt_values.stack_pointer = CreateNewRegisterFromPtr(rinst, &rt.SP, rinst.builder->getInt64Ty(), "sp_");
+    rt_values.stack_pointer = CreateNewRegisterFromGlobal(rinst, "stack_pointer", rinst.builder->getInt64Ty(), "sp_");
 
     // Fill in general purpose registers
     for (unsigned idx = 0; idx != rt_values.registers.size(); ++idx)
-        rt_values.registers[idx] = CreateNewRegisterFromPtr(rinst, &rt.registers[idx], rinst.builder->getInt64Ty(), "x"+std::to_string(idx)+'_');
+        rt_values.registers[idx] = CreateNewRegisterFromGlobal(rinst, "general_register_"+std::to_string(idx), rinst.builder->getInt64Ty(), "x"+std::to_string(idx)+'_');
 
     // Fill in vector registers
     for (unsigned idx = 0; idx != rt_values.vectors.size(); ++idx)
-        rt_values.vectors[idx] = CreateNewRegisterFromPtr(rinst, &rt.vectors[idx], rinst.builder->getInt128Ty(), "q"+std::to_string(idx)+'_');
+        rt_values.vectors[idx] = CreateNewRegisterFromGlobal(rinst, "vector_register_"+std::to_string(idx), rinst.builder->getInt128Ty(), "q"+std::to_string(idx)+'_');
 
     // Fill in comparisation
-    rt_values.comparison.first = CreateNewRegisterFromPtr(rinst, &rt.comparison.first, rinst.builder->getInt64Ty(), "comp_first_");
-    rt_values.comparison.second = CreateNewRegisterFromPtr(rinst, &rt.comparison.second, rinst.builder->getInt64Ty(), "comp_second_");
+    rt_values.comparison.first = CreateNewRegisterFromGlobal(rinst, "comparison_first", rinst.builder->getInt64Ty(), "comp_first_");
+    rt_values.comparison.second = CreateNewRegisterFromGlobal(rinst, "comparison_second", rinst.builder->getInt64Ty(), "comp_second_");
 
     // Fill in NZCV
-    rt_values.nzcv = CreateNewRegisterFromPtr(rinst, &rt.nzcv, rinst.builder->getInt8Ty(), "nzcv_");
+    rt_values.nzcv = CreateNewRegisterFromGlobal(rinst, "nzcv", rinst.builder->getInt8Ty(), "nzcv_");
 }
 
 void Lifter::CreateRegisterSave(Instance& rinst) {
     // Write out stack pointer
-    CreateStoreRegisterToPtr(rinst, &rt.SP, rt_values.stack_pointer, rinst.builder->getInt64Ty());
+    CreateStoreRegisterToGlobal(rinst, "stack_pointer", rinst.builder->getInt64Ty(), rt_values.stack_pointer);
 
     // Write out general purpose registers
     for (unsigned idx = 0; idx !=rt_values. registers.size(); ++idx)
-        CreateStoreRegisterToPtr(rinst, &rt.registers[idx], rt_values.registers[idx], rinst.builder->getInt64Ty());
+        CreateStoreRegisterToGlobal(rinst, "general_register_"+std::to_string(idx), rinst.builder->getInt64Ty(), rt_values.registers[idx]);
 
     // Write out vector registers
     for (unsigned idx = 0; idx != rt_values.vectors.size(); ++idx)
-        CreateStoreRegisterToPtr(rinst, &rt.vectors[idx], rt_values.vectors[idx], rinst.builder->getInt128Ty());
+        CreateStoreRegisterToGlobal(rinst, "vector_register_"+std::to_string(idx), rinst.builder->getInt128Ty(), rt_values.vectors[idx]);
 
     // Write out comparisation
-    CreateStoreRegisterToPtr(rinst, &rt.comparison.first, rt_values.comparison.first, rinst.builder->getInt64Ty());
-    CreateStoreRegisterToPtr(rinst, &rt.comparison.second, rt_values.comparison.second, rinst.builder->getInt64Ty());
+    CreateStoreRegisterToGlobal(rinst, "comparison_first", rinst.builder->getInt64Ty(), rt_values.comparison.first);
+    CreateStoreRegisterToGlobal(rinst, "comparison_first", rinst.builder->getInt64Ty(), rt_values.comparison.second);
 
     // Write out NZCV
-    CreateStoreRegisterToPtr(rinst, &rt.nzcv, rt_values.nzcv, rinst.builder->getInt64Ty());
+    CreateStoreRegisterToGlobal(rinst, "nzcv", rinst.builder->getInt8Ty(), rt_values.nzcv);
 }
 
 void Lifter::CreatePCSave(Instance& rinst) {
-    CreateStoreToPtr(rinst, &rt.PC, rinst.builder->getInt64(rinst.pc));
+    rinst.builder->CreateStore(rinst.builder->getInt64(rinst.pc), rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<uint64_t>(&rt.pc)), rinst.builder->getPtrTy()));
 }
 
-Value *Lifter::CreateNewRegisterFromPtr(Instance& rinst, void *ptr, llvm::Type *type, const llvm::Twine& name) {
+Value *Lifter::CreateNewRegisterFromGlobal(Instance& rinst, llvm::StringRef global_name, llvm::Type *type, const llvm::Twine& name) {
     Value *fres = rinst.builder->CreateAlloca(type, nullptr, name);
-    rinst.builder->CreateStore(CreateLoadFromPtr(rinst, ptr, type, name), fres);
+    rinst.builder->CreateStore(rinst.builder->CreateLoad(type, rinst.module->getOrInsertGlobal(global_name, type)), fres);
     return fres;
 }
 
-void Lifter::CreateStoreRegisterToPtr(Instance& rinst, void *ptr, llvm::Value *alloca, llvm::Type *type) {
-    CreateStoreToPtr(rinst, ptr, rinst.builder->CreateLoad(type, alloca));
-}
-
-Value *Lifter::CreateLoadFromPtr(Instance& rinst, void *ptr, Type *type, const llvm::Twine& name) {
-    return rinst.builder->CreateLoad(type, rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<uint64_t>(ptr)), rinst.builder->getPtrTy()), name);
-}
-
-void Lifter::CreateStoreToPtr(Instance& rinst, void *ptr, llvm::Value *value) {
-    rinst.builder->CreateStore(value, rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<uint64_t>(ptr)), rinst.builder->getPtrTy()));
+void Lifter::CreateStoreRegisterToGlobal(Instance& rinst, llvm::StringRef global_name, llvm::Type *type, llvm::Value *alloca) {
+    rinst.builder->CreateStore(rinst.builder->CreateLoad(type, alloca), rinst.module->getNamedGlobal(global_name));
 }
 
 Value *Lifter::CreateMemoryLoad(Instance& rinst, llvm::Value *address, Type *type) {

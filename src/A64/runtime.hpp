@@ -49,13 +49,7 @@ struct Runtime::Impl {
     ExecutionContext exc;
     bool executing = false;
     HaltReason halt_reason;
-
-    VAddr PC = 0,
-        SP = 0;
-    std::array<uint64_t, 31> registers{};
-    std::array<Vector, 32> vectors{};
-    std::pair<uint64_t, uint64_t> comparison{};
-    uint8_t nzcv{};
+    VAddr pc;
 
     Lifter raiser;
     UserConfig conf;
@@ -71,6 +65,9 @@ struct Runtime::Impl {
 
     /// Recreates JIT. Updates IsOk() state.
     void CreateJit();
+
+    /// Create new globals. Called by CreateJit(). Updates IsOk() state.
+    void CreateGlobals();
 
     /// Periodically called from generated code, may yield execution.
     void UpdateExecutionState();
