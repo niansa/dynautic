@@ -524,6 +524,25 @@ bool Lifter::InstructionLifter::Run() {
             reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
             p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[1]));
         } return;
+        // Atomic load and store instructions
+        case AArch64_INS_CAS:
+        case AArch64_INS_CASA:
+        case AArch64_INS_CASL:
+        case AArch64_INS_CASAL: { //TODO: Untested!
+            AtomicOrdering ordering;
+            switch (id) {
+            case AArch64_INS_CAS: ordering = AtomicOrdering::NotAtomic; break;
+            case AArch64_INS_CASA: ordering = AtomicOrdering::Acquire; break;
+            case AArch64_INS_CASL: ordering = AtomicOrdering::Release; break;
+            case AArch64_INS_CASAL: ordering = AtomicOrdering::AcquireRelease; break;
+            }
+
+            const auto ops = GetOps(2);
+            Type *type = rinst.GetType(ops[0].size);
+            Value *reference = GetMemOpReference(false, 2);
+            Value *result = rinst.builder->CreateAtomicCmpXchg(reference, p.GetRegisterView(rinst, ops[0]), p.GetRegisterView(rinst, ops[1]), MaybeAlign(), ordering, ordering);
+            p.StoreRegister(rinst, ops[0], result);
+        } return;
         // Branch instructions
         case AArch64_INS_BL: {
             // Use BLR implementation if address is immediate
