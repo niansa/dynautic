@@ -132,11 +132,12 @@ BasicBlock *Lifter::InstructionLifter::PrepareBranch(unsigned op_idx) {
     default: {
         DYNAUTIC_ASSERT(!"Unknown operand type");
         p.CreateExceptionTrampoline(rinst, Exception::UnpredictableInstruction);
+        return nullptr;
     }
     }
 }
 
-std::pair<Value *, int32_t> Lifter::InstructionLifter::GetMemOpReference(bool unscaled, unsigned op_idx) {
+Value *Lifter::InstructionLifter::GetMemOpReference(bool unscaled, unsigned op_idx) {
     const auto& addrop = detail.operands[op_idx];
     DYNAUTIC_ASSERT(addrop.type == AArch64_OP_MEM);
     RegisterDescription base_reg(p.cs_handle, addrop.mem.base);
@@ -149,7 +150,9 @@ std::pair<Value *, int32_t> Lifter::InstructionLifter::GetMemOpReference(bool un
     Value *reference = rinst.builder->CreateAdd(base, p.GetRegisterView(rinst, {p.cs_handle, addrop.mem.index}));
     if (insn.detail->writeback)
         p.StoreRegister(rinst, base_reg, rinst.builder->CreateAdd(reference, ConstantInt::get(reference->getType(), static_cast<uint64_t>(displacement))));
-    return {reference, detail.post_index?0:displacement};
+    if (displacement && !detail.post_index)
+        reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(static_cast<uint64_t>(displacement)));
+    return reference;
 }
 
 uint8_t Lifter::InstructionLifter::GetLoadStoreFlagsAndSize(uint64_t insn_id) {
@@ -470,9 +473,7 @@ bool Lifter::InstructionLifter::Run() {
             const uint8_t msiz = GetLoadStoreFlagsAndSize(id);
 
             const auto op = GetOps(1)[0];
-            auto [reference, displacement] = GetMemOpReference(extra_flags[0]);
-            if (displacement)
-                reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(static_cast<uint64_t>(displacement)));
+            Value *reference = GetMemOpReference(extra_flags[0]);
             Value *value = p.CreateMemoryLoad(rinst, reference, rinst.GetType(msiz?msiz:op.size));
             if (msiz)
                 value = rinst.builder->CreateIntCast(value, rinst.GetType(op.size), extra_flags[signed_]);
@@ -491,21 +492,17 @@ bool Lifter::InstructionLifter::Run() {
             const uint8_t msiz = GetLoadStoreFlagsAndSize(id);
 
             const auto op = GetOps(1)[0];
-            auto [reference, displacement] = GetMemOpReference(extra_flags[0]);
+            Value *reference = GetMemOpReference(extra_flags[0]);
             Value *value = p.GetRegisterView(rinst, op);
             if (msiz)
                 value = rinst.builder->CreateIntCast(value, rinst.GetType(msiz), extra_flags[signed_]);
-            if (displacement)
-                reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(static_cast<uint64_t>(displacement)));
             p.CreateMemoryStore(rinst, reference, value);
         } return;
         case AArch64_INS_ALIAS_LDPSW:
         case AArch64_INS_LDPSW: {
             const auto ops = GetOps(2);
             Type *type = rinst.GetType(ops[0].size);
-            auto [reference, displacement] = GetMemOpReference(false, 2);
-            if (displacement)
-                reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(static_cast<uint64_t>(displacement)));
+            Value *reference = GetMemOpReference(false, 2);
             p.StoreRegister(rinst, ops[0], rinst.builder->CreateIntCast(p.CreateMemoryLoad(rinst, reference, rinst.builder->getInt32Ty()), type, true));
             reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
             p.StoreRegister(rinst, ops[1], rinst.builder->CreateIntCast(p.CreateMemoryLoad(rinst, reference, rinst.builder->getInt32Ty()), type, true));
@@ -514,9 +511,7 @@ bool Lifter::InstructionLifter::Run() {
         case AArch64_INS_LDP: {
             const auto ops = GetOps(2);
             Type *type = rinst.GetType(ops[0].size);
-            auto [reference, displacement] = GetMemOpReference(false, 2);
-            if (displacement)
-                reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(static_cast<uint64_t>(displacement)));
+            Value *reference = GetMemOpReference(false, 2);
             p.StoreRegister(rinst, ops[0], p.CreateMemoryLoad(rinst, reference, type));
             reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
             p.StoreRegister(rinst, ops[1], p.CreateMemoryLoad(rinst, reference, type));
@@ -524,9 +519,7 @@ bool Lifter::InstructionLifter::Run() {
         case AArch64_INS_ALIAS_STP:
         case AArch64_INS_STP: {
             const auto ops = GetOps(2);
-            auto [reference, displacement] = GetMemOpReference(false, 2);
-            if (displacement)
-                reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(static_cast<uint64_t>(displacement)));
+            Value *reference = GetMemOpReference(false, 2);
             p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[0]));
             reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
             p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[1]));

@@ -47,7 +47,7 @@ class Lifter::InstructionLifter {
     void CreateCall(unsigned op_idx = 0);
     llvm::BasicBlock *PrepareBranch(unsigned op_idx = 0);
 
-    std::pair<llvm::Value *, int32_t> GetMemOpReference(bool unscaled, unsigned op_idx = 1);
+    llvm::Value *GetMemOpReference(bool unscaled, unsigned op_idx = 1);
 
     enum LoadStoreFlags {
         unscaled,
