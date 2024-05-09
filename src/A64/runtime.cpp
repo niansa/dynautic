@@ -73,6 +73,13 @@ Runtime::Impl::Impl(UserConfig conf_, Runtime *parent)
     conf.use_cache = conf.use_cache && conf.HasOptimization(OptimizationFlag::BlockLinking);
     conf.fully_static = conf.fully_static && conf.use_cache;
 
+    // Create global monitor if not ignored
+    if (!conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)
+        && !conf.HasOptimization(OptimizationFlag::Unsafe_WeakGlobalMonitor)) {
+        GlobalMonitor::Create(conf.system_id, conf.native_memory);
+        monitor = &GlobalMonitor::Get(conf.system_id);
+    }
+
     // Create JIT engine
     CreateJit();
 }
@@ -270,10 +277,6 @@ std::uint32_t Runtime::GetPstate() const {
     //
 }
 void Runtime::SetPstate(std::uint32_t value) {
-    //
-}
-
-void Runtime::ClearExclusiveState() {
     //
 }
 

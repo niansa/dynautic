@@ -158,7 +158,7 @@ void Lifter::InstructionLifter::SetComparison(llvm::Value *a, llvm::Value *b) {
     p.rt_values.dirty_comparison = true;
     // Unset NZCV used flag
     if (p.rt_values.nzcv) {
-        p.rt_values.nzcv = rinst.builder->CreateAnd(p.rt_values.nzcv, ~nzcv_used, "nzcv_");
+        p.rt_values.nzcv = rinst.builder->CreateAnd(p.rt_values.nzcv, ~static_cast<uint64_t>(nzcv_used), "nzcv_");
         p.rt_values.dirty_nzcv = true;
     }
 }

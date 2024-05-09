@@ -72,57 +72,55 @@ enum class DataCacheOperation {
 struct UserCallbacks {
     virtual ~UserCallbacks() = default;
 
-    // All reads through this callback are 4-byte aligned.
-    // Memory must be interpreted as little endian.
+    /// All reads through this callback are 4-byte aligned.
+    /// Memory must be interpreted as little endian.
     virtual std::optional<std::uint32_t> MemoryReadCode(VAddr vaddr) { return MemoryRead32(vaddr); }
 
-    // Reads through these callbacks may not be aligned.
+    /// Reads through these callbacks may not be aligned.
     virtual std::uint8_t MemoryRead8(VAddr vaddr) = 0;
     virtual std::uint16_t MemoryRead16(VAddr vaddr) = 0;
     virtual std::uint32_t MemoryRead32(VAddr vaddr) = 0;
     virtual std::uint64_t MemoryRead64(VAddr vaddr) = 0;
     virtual Vector MemoryRead128(VAddr vaddr) = 0;
 
-    // Writes through these callbacks may not be aligned.
+    /// Writes through these callbacks may not be aligned.
     virtual void MemoryWrite8(VAddr vaddr, std::uint8_t value) = 0;
     virtual void MemoryWrite16(VAddr vaddr, std::uint16_t value) = 0;
     virtual void MemoryWrite32(VAddr vaddr, std::uint32_t value) = 0;
     virtual void MemoryWrite64(VAddr vaddr, std::uint64_t value) = 0;
     virtual void MemoryWrite128(VAddr vaddr, Vector value) = 0;
 
-    // Writes through these callbacks may not be aligned.
-    virtual bool MemoryWriteExclusive8(VAddr /*vaddr*/, std::uint8_t /*value*/, std::uint8_t /*expected*/) { return false; }
-    virtual bool MemoryWriteExclusive16(VAddr /*vaddr*/, std::uint16_t /*value*/, std::uint16_t /*expected*/) { return false; }
-    virtual bool MemoryWriteExclusive32(VAddr /*vaddr*/, std::uint32_t /*value*/, std::uint32_t /*expected*/) { return false; }
-    virtual bool MemoryWriteExclusive64(VAddr /*vaddr*/, std::uint64_t /*value*/, std::uint64_t /*expected*/) { return false; }
-    virtual bool MemoryWriteExclusive128(VAddr /*vaddr*/, Vector /*value*/, Vector /*expected*/) { return false; }
-
-    // If this callback returns true, the JIT will assume MemoryRead* callbacks will always
-    // return the same value at any point in time for this vaddr. The JIT may use this information
-    // in optimizations.
-    // A conservative implementation that always returns false is safe.
+    /// If this callback returns true, the JIT will assume MemoryRead* callbacks will always
+    /// return the same value at any point in time for this vaddr. The JIT may use this information
+    /// in optimizations.
+    /// A conservative implementation that always returns false is safe.
     virtual bool IsReadOnlyMemory(VAddr /*vaddr*/) { return false; }
 
     /// The interpreter must execute exactly num_instructions starting from PC.
     virtual void InterpreterFallback(VAddr pc, size_t num_instructions) = 0;
 
-    // This callback is called whenever a SVC instruction is executed.
+    /// This callback is called whenever an SVC instruction is executed.
     virtual void CallSVC(std::uint32_t swi) = 0;
 
     virtual void ExceptionRaised(VAddr pc, Exception exception) = 0;
     virtual void DataCacheOperationRaised(DataCacheOperation /*op*/, VAddr /*value*/) {}
 
-    // Timing-related callbacks
-    // ticks ticks have passed
+    /// Timing-related callbacks
+    /// ticks ticks have passed
     virtual void AddTicks(std::uint64_t ticks) = 0;
-    // How many more ticks am I allowed to execute?
+    /// How many more ticks am I allowed to execute?
     virtual std::uint64_t GetTicksRemaining() = 0;
-    // Get value in the emulated counter-timer physical count register.
+    /// Get value in the emulated counter-timer physical count register.
     virtual std::uint64_t GetCNTPCT() = 0;
 };
 
 struct UserConfig {
     UserCallbacks* callbacks;
+
+    /// All instances operating together in a multithreaded scenario sharing the a memory
+    /// space must have the same system_id.
+    /// system_ids should count up from 0.
+    uint8_t system_id = 0;
 
     size_t processor_id = 0;
 
@@ -132,9 +130,6 @@ struct UserConfig {
     OptimizationFlag optimizations = all_safe_optimizations;
 
     bool HasOptimization(OptimizationFlag f) const {
-        if (!unsafe_optimizations) {
-            f &= all_safe_optimizations;
-        }
         return (f & optimizations) != no_optimizations;
     }
 
@@ -157,12 +152,12 @@ struct UserConfig {
 
     /// When set to true, Dynautic will attempt to continue in unexpected situations (mostly
     /// those created by unsafe optimizations or incorrect imlementation) instead of raising
-    /// an UnpredictableInstruction exception. Assertions may still trigger if enabled
+    /// an UnpredictableInstruction exception. Assertions may still trigger if enabled.
     bool unsafe_unexpected_situation_handling = false;
 
     /// When set to true, no memory access callbacks other than MemoryReadCode are called.
-    /// Instead, all memory accesses are translated to native memory accesses. Note that
-    /// this allows the emulated code to hijack the rest of the application.
+    /// Instead, memory accesses are translated to native memory accesses. Note that this
+    /// allows the emulated code to hijack the rest of the application.
     /// Note that if this is enabled it is up to the operating system to handle access
     /// faults. The application is responsible for setting up handlers indepdently.
     bool native_memory = false;
@@ -174,8 +169,8 @@ struct UserConfig {
     bool hook_data_cache_operations = false;
 
     /// When set to true, cache will be updated. This will decrease performance at the cost
-    /// of generating cache entries that may be used for great performance increases with
-    /// use_cache enabled later on.
+    /// of generating cache entries that may be used for performance increases with use_cache
+    /// enabled later on.
     bool update_cache = false;
 
     /// When set to true, cache will be used to generate more optimized code. This is only
@@ -225,73 +220,6 @@ struct UserConfig {
     /// Pointer to where TPIDR_EL0 is stored. This pointer will be inserted into
     /// emitted code.
     std::uint64_t* tpidr_el0 = nullptr;
-
-//    /// Pointer to the page table which we can use for direct page table access.
-//    /// If an entry in page_table is null, the relevant memory callback will be called.
-//    /// If page_table is nullptr, all memory accesses hit the memory callbacks.
-//    void** page_table = nullptr;
-//    /// Declares how many valid address bits are there in virtual addresses.
-//    /// Determines the size of page_table. Valid values are between 12 and 64 inclusive.
-//    /// This is only used if page_table is not nullptr.
-//    size_t page_table_address_space_bits = 36;
-//    /// Masks out the first N bits in host pointers from the page table.
-//    /// The intention behind this is to allow users of Dynautic to pack attributes in the
-//    /// same integer and update the pointer attribute pair atomically.
-//    /// If the configured value is 3, all pointers will be forcefully aligned to 8 bytes.
-//    int page_table_pointer_mask_bits = 0;
-//    /// Determines what happens if the guest accesses an entry that is off the end of the
-//    /// page table. If true, Dynautic will silently mirror page_table's address space. If
-//    /// false, accessing memory outside of page_table bounds will result in a call to the
-//    /// relevant memory callback.
-//    /// This is only used if page_table is not nullptr.
-//    bool silently_mirror_page_table = true;
-//    /// Determines if the pointer in the page_table shall be offseted locally or globally.
-//    /// 'false' will access page_table[addr >> bits][addr & mask]
-//    /// 'true'  will access page_table[addr >> bits][addr]
-//    /// Note: page_table[addr >> bits] will still be checked to verify active pages.
-//    ///       So there might be wrongly faulted pages which maps to nullptr.
-//    ///       This can be avoided by carefully allocating the memory region.
-//    bool absolute_offset_page_table = false;
-//    /// Determines if we should detect memory accesses via page_table that straddle are
-//    /// misaligned. Accesses that straddle page boundaries will fallback to the relevant
-//    /// memory callback.
-//    /// This value should be the required access sizes this applies to ORed together.
-//    /// To detect any access, use: 8 | 16 | 32 | 64 | 128.
-//    std::uint8_t detect_misaligned_access_via_page_table = 0;
-//    /// Determines if the above option only triggers when the misalignment straddles a
-//    /// page boundary.
-//    bool only_detect_misalignment_via_page_table_on_page_boundary = false;
-
-//    /// Fastmem Pointer
-//    /// This should point to the beginning of a 2^page_table_address_space_bits bytes
-//    /// address space which is in arranged just like what you wish for emulated memory to
-//    /// be. If the host page faults on an address, the JIT will fallback to calling the
-//    /// MemoryRead*/MemoryWrite* callbacks.
-//    std::optional<uintptr_t> fastmem_pointer = std::nullopt;
-//    /// Determines if instructions that pagefault should cause recompilation of that block
-//    /// with fastmem disabled.
-//    /// Recompiled code will use the page_table if this is available, otherwise memory
-//    /// accesses will hit the memory callbacks.
-//    bool recompile_on_fastmem_failure = true;
-//    /// Declares how many valid address bits are there in virtual addresses.
-//    /// Determines the size of fastmem arena. Valid values are between 12 and 64 inclusive.
-//    /// This is only used if fastmem_pointer is set.
-//    size_t fastmem_address_space_bits = 36;
-//    /// Determines what happens if the guest accesses an entry that is off the end of the
-//    /// fastmem arena. If true, Dynautic will silently mirror fastmem's address space. If
-//    /// false, accessing memory outside of fastmem bounds will result in a call to the
-//    /// relevant memory callback.
-//    /// This is only used if fastmem_pointer is set.
-//    bool silently_mirror_fastmem = true;
-
-//    /// Determines if we should use the above fastmem_pointer for exclusive reads and
-//    /// writes. On x64, Dynautic currently relies on x64 cmpxchg semantics which may not
-//    /// provide fully accurate emulation.
-//    bool fastmem_exclusive_access = false;
-//    /// Determines if exclusive access instructions that pagefault should cause
-//    /// recompilation of that block with fastmem disabled. Recompiled code will use memory
-//    /// callbacks.
-//    bool recompile_on_exclusive_fastmem_failure = true;
 
     /// HACK:
     /// This tells the translator a wall clock will be used, thus allowing it
@@ -398,9 +326,6 @@ public:
     std::uint32_t GetPstate() const;
     /// Modify PSTATE
     void SetPstate(std::uint32_t value);
-
-    /// Clears exclusive state for this core.
-    void ClearExclusiveState();
 
     /// Dumps cache for later use.
     std::vector<uint64_t> DumpCache() const;

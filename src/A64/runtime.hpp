@@ -2,6 +2,7 @@
 
 #include "lifter.hpp"
 #include "cache.hpp"
+#include "../globalmonitor.hpp"
 #include "../llvm.hpp"
 
 #include "../minicoro.h"
@@ -46,6 +47,7 @@ public:
 struct Runtime::Impl {
     Runtime *parent;
 
+    GlobalMonitor *monitor = nullptr;
     ExecutionContext exc;
     bool executing = false;
     HaltReason halt_reason;

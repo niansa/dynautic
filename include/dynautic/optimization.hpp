@@ -36,9 +36,13 @@ enum class OptimizationFlag : std::uint32_t {
     /// result in unexpected behaviour in multithreaded scenarios, including but not limited
     /// to data races and deadlocks.
     Unsafe_IgnoreGlobalMonitor = 0x00100000,
+    /// This is an UNSAFE optimization that causes the global monitor to rely on fast cmpxchg semantics. This
+    /// may result in unexpected behaviour in multithreaded scenarios, including but not limited to data races
+    /// and deadlocks.
+    Unsafe_WeakGlobalMonitor = 0x00200000,
     /// This is an UNSAFE optimization that makes CMP results local to block scope. This slightly reduces
     /// branching overhead after CMP instructions. This may result in unexpected behavior in certain situations.
-    Unsafe_ScopedCMP = 0x00100000,
+    Unsafe_ScopedCMP = 0x00400000,
 };
 
 constexpr OptimizationFlag no_optimizations = static_cast<OptimizationFlag>(0);
