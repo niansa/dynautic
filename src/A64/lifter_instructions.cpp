@@ -541,15 +541,48 @@ bool Lifter::InstructionLifter::Run() {
             case AArch64_INS_CASAL: ordering = AtomicOrdering::AcquireRelease; break;
             }
 
+            const auto ops = GetOps(2);
+            Value *reference = GetMemOpReference(false, 2);
+
             if (p.rt.conf.native_memory) {
-                const auto ops = GetOps(2);
-                Value *reference = GetMemOpReference(false, 2);
                 reference = rinst.builder->CreateIntToPtr(reference, rinst.builder->getPtrTy());
-                Value *result = rinst.builder->CreateAtomicCmpXchg(reference, p.GetRegisterView(rinst, ops[0]), p.GetRegisterView(rinst, ops[1]), MaybeAlign(), ordering, AtomicOrdering::Monotonic);
-                result = rinst.builder->CreateExtractValue(result, 0);
-                p.StoreRegister(rinst, ops[0], result);
+                Value *value = rinst.builder->CreateAtomicCmpXchg(reference, p.GetRegisterView(rinst, ops[0]), p.GetRegisterView(rinst, ops[1]), MaybeAlign(), ordering, AtomicOrdering::Monotonic);
+                value = rinst.builder->CreateExtractValue(value, 0);
+                p.StoreRegister(rinst, ops[0], value);
             } else {
-                //TODO
+                Type *type = rinst.GetType(ops[0].size);
+                BasicBlock *loop;
+                if (!p.rt.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)) {
+                    // Create basic block for retry loop
+                    loop = rinst.CreateBasicBlock("CASRetryLoop");
+                    // Jump into loop
+                    rinst.builder->CreateBr(loop);
+                    rinst.UseBasicBlock(loop);
+                    // Tag memory location
+                    p.CreateExclusiveMonitorTagTrampoline(rinst, reference);
+                }
+                // Load value
+                Value *value = p.CreateMemoryLoad(rinst, reference, type);
+                // Compare loaded value against first register
+                Value *cmp_eq = rinst.builder->CreateICmpEQ(value, p.GetRegisterView(rinst, ops[0]));
+                // Select new value
+                value = rinst.builder->CreateSelect(cmp_eq, p.GetRegisterView(rinst, ops[1]), value);
+                // Write new value to memory
+                p.CreateMemoryStore(rinst, reference, value);
+                if (!p.rt.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)) {
+                    // Check if memory has been poisoned on the way here
+                    Value *poisoned = p.CreateExclusiveMonitorIsPoisonedTrampoline(rinst, reference);
+                    // Untag memory location
+                    p.CreateExclusiveMonitorUntagTrampoline(rinst, reference);
+                    // Create continuation basic block
+                    BasicBlock *continuation = rinst.CreateBasicBlock("CASRetryContinue");
+                    // Restart loop if poisoned
+                    rinst.builder->CreateCondBr(poisoned, loop, continuation);
+                    // Continue outside loop
+                    rinst.UseBasicBlock(continuation);
+                }
+                // Write new value to register
+                p.StoreRegister(rinst, ops[0], value);
             }
         } return;
         // Branch instructions

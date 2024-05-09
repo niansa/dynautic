@@ -74,8 +74,7 @@ Runtime::Impl::Impl(UserConfig conf_, Runtime *parent)
     conf.fully_static = conf.fully_static && conf.use_cache;
 
     // Create global monitor if not ignored
-    if (!conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)
-        && !conf.HasOptimization(OptimizationFlag::Unsafe_WeakGlobalMonitor)) {
+    if (!conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)) {
         GlobalMonitor::Create(conf.system_id, conf.native_memory);
         monitor = &GlobalMonitor::Get(conf.system_id);
     }

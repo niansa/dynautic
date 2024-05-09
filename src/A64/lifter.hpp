@@ -82,8 +82,9 @@ class Lifter {
         bool dirty_stack_pointer{};
         std::pair<llvm::Value *, llvm::Value *> comparison;
         bool dirty_comparison{};
-        llvm::Value * nzcv;
+        llvm::Value *nzcv;
         bool dirty_nzcv{};
+        llvm::Value *exclusive_monitor{};
     } rt_values;
 
     void ResetScratchRegisters();
@@ -122,6 +123,10 @@ class Lifter {
     void CreateSvcTrampoline(Instance&, uint32_t swi);
     void CreateExceptionTrampoline(Instance&, Exception);
     void CreateFreezeTrampoline(Instance&);
+    void CreateExclusiveMonitorTagTrampoline(Instance&, llvm::Value *addr);
+    void CreateExclusiveMonitorUntagTrampoline(Instance&, llvm::Value *addr);
+    void CreateExclusiveMonitorPoisonTrampoline(Instance&, llvm::Value *addr);
+    llvm::Value *CreateExclusiveMonitorIsPoisonedTrampoline(Instance&, llvm::Value *addr);
     void CreateDebugPrintTrampoline(Instance&, const char *message);
 
     static llvm::FunctionCallee GetMemoryRead(Instance&, uint8_t bits);
@@ -132,6 +137,10 @@ class Lifter {
     static llvm::FunctionCallee GetUpdateExecutionStateTrampoline(Instance&);
     static llvm::FunctionCallee GetCreateDynamicBranchEntryTrampoline(Instance&);
     static llvm::FunctionCallee GetFreezeTrampoline(Instance&);
+    static llvm::FunctionCallee GetExclusiveMonitorTagTrampoline(Instance&);
+    static llvm::FunctionCallee GetExclusiveMonitorUntagTrampoline(Instance&);
+    static llvm::FunctionCallee GetExclusiveMonitorPoisonTrampoline(Instance&);
+    static llvm::FunctionCallee GetExclusiveMonitorIsPoisonedTrampoline(Instance&);
 #ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
     static llvm::FunctionCallee GetDebugPrintTrampoline(Instance&);
 

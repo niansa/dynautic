@@ -118,6 +118,21 @@ void Lifter::CreateMemoryStore(Instance& rinst, llvm::Value *address, llvm::Valu
         return;
     }
 
+    if (!rt.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)) {
+        if (rt_values.exclusive_monitor != address) {
+            CreateExclusiveMonitorPoisonTrampoline(rinst, address);
+        } else if (rt_values.exclusive_monitor) {
+            llvm::Value *should_poison = rinst.builder->CreateICmpNE(rt_values.exclusive_monitor, address);
+            BasicBlock *poison_branch = rinst.CreateBasicBlock("PoisonBranch");
+            BasicBlock *continue_branch = rinst.CreateBasicBlock("PoisonContinue");
+            rinst.builder->CreateCondBr(should_poison, poison_branch, continue_branch);
+            rinst.UseBasicBlock(poison_branch);
+            CreateExclusiveMonitorPoisonTrampoline(rinst, address);
+            rinst.builder->CreateBr(continue_branch);
+            rinst.UseBasicBlock(continue_branch);
+        }
+    }
+
     Value *runtime = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
     rinst.builder->CreateCall(GetMemoryWrite(rinst, static_cast<uint8_t>(data->getType()->getIntegerBitWidth())), {runtime, address, data});
     if (rt.conf.check_halt_on_memory_access)
@@ -295,6 +310,33 @@ void Lifter::CreateFreezeTrampoline(Instance& rinst) {
     rinst.builder->CreateCall(GetFreezeTrampoline(rinst), {runtime});
     rinst.builder->CreateRetVoid();
     rinst.block_terminated = true;
+}
+
+void Lifter::CreateExclusiveMonitorTagTrampoline(Instance& rinst, llvm::Value *addr) {
+    Value *runtime = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
+
+    rinst.builder->CreateCall(GetExclusiveMonitorTagTrampoline(rinst), {runtime, addr});
+    rt_values.exclusive_monitor = addr;
+}
+
+void Lifter::CreateExclusiveMonitorUntagTrampoline(Instance& rinst, llvm::Value *addr) {
+    Value *runtime = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
+
+    rinst.builder->CreateCall(GetExclusiveMonitorUntagTrampoline(rinst), {runtime, addr});
+    rt_values.exclusive_monitor = nullptr;
+}
+
+void Lifter::CreateExclusiveMonitorPoisonTrampoline(Instance& rinst, llvm::Value *addr) {
+    Value *runtime = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
+
+    rinst.builder->CreateCall(GetExclusiveMonitorPoisonTrampoline(rinst), {runtime, addr});
+}
+
+llvm::Value *Lifter::CreateExclusiveMonitorIsPoisonedTrampoline(Instance& rinst, llvm::Value *addr) {
+    Value *runtime = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
+
+    Value *result = rinst.builder->CreateCall(GetExclusiveMonitorIsPoisonedTrampoline(rinst), {runtime, addr});
+    return rinst.builder->CreateICmpNE(result, rinst.builder->getInt8(0));
 }
 
 void Lifter::CreateDebugPrintTrampoline(Instance& rinst, const char *message) {

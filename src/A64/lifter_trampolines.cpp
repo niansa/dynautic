@@ -1,6 +1,7 @@
 #include "lifter.hpp"
 #include "lifter_instance.hpp"
 #include "runtime.hpp"
+#include "../globalmonitor.hpp"
 #include "../llvm.hpp"
 
 #include <iostream>
@@ -55,6 +56,23 @@ void FreezeTrampoline(Runtime::Impl& rt) {
         std::this_thread::yield();
         rt.UpdateExecutionState();
     }
+}
+
+void ExclusiveMonitorTagTrampoline(Runtime::Impl& rt, VAddr address) {
+    DYNAUTIC_ASSERT(rt.monitor);
+    rt.monitor->Tag(address, rt.conf.processor_id);
+}
+void ExclusiveMonitorUntagTrampoline(Runtime::Impl& rt, VAddr address) {
+    DYNAUTIC_ASSERT(rt.monitor);
+    rt.monitor->Untag(address, rt.conf.processor_id);
+}
+void ExclusiveMonitorPoisonTrampoline(Runtime::Impl& rt, VAddr address) {
+    DYNAUTIC_ASSERT(rt.monitor);
+    rt.monitor->Poison(address);
+}
+bool ExclusiveMonitorIsPoisonedTrampoline(Runtime::Impl& rt, VAddr address) {
+    DYNAUTIC_ASSERT(rt.monitor);
+    return rt.monitor->IsPoinsoned(address, rt.conf.processor_id);
 }
 
 #ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
@@ -146,6 +164,18 @@ void Lifter::SetupTrampolines(llvm::orc::LLJIT& jit) {
         { jit.mangleAndIntern("FreezeTrampoline"),
          { llvm::orc::ExecutorAddr::fromPtr(&FreezeTrampoline),
           llvm::JITSymbolFlags::Callable } },
+        { jit.mangleAndIntern("ExclusiveMonitorTagTrampoline"),
+         { llvm::orc::ExecutorAddr::fromPtr(&ExclusiveMonitorTagTrampoline),
+          llvm::JITSymbolFlags::Callable } },
+        { jit.mangleAndIntern("ExclusiveMonitorUntagTrampoline"),
+         { llvm::orc::ExecutorAddr::fromPtr(&ExclusiveMonitorUntagTrampoline),
+          llvm::JITSymbolFlags::Callable } },
+        { jit.mangleAndIntern("ExclusiveMonitorPoisonTrampoline"),
+         { llvm::orc::ExecutorAddr::fromPtr(&ExclusiveMonitorPoisonTrampoline),
+          llvm::JITSymbolFlags::Callable } },
+        { jit.mangleAndIntern("ExclusiveMonitorIsPoisonedTrampoline"),
+         { llvm::orc::ExecutorAddr::fromPtr(&ExclusiveMonitorIsPoisonedTrampoline),
+          llvm::JITSymbolFlags::Callable } },
 #ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
         { jit.mangleAndIntern("DebugPrintTrampoline"),
          { llvm::orc::ExecutorAddr::fromPtr(&DebugPrintTrampoline),
@@ -236,6 +266,26 @@ llvm::FunctionCallee Lifter::GetCreateDynamicBranchEntryTrampoline(Instance& rin
 llvm::FunctionCallee Lifter::GetFreezeTrampoline(Instance& rinst) {
     const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy()}, false);
     return rinst.module->getOrInsertFunction("FreezeTrampoline", ftype);
+}
+
+llvm::FunctionCallee Lifter::GetExclusiveMonitorTagTrampoline(Instance& rinst) {
+    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty()}, false);
+    return rinst.module->getOrInsertFunction("ExclusiveMonitorTagTrampoline", ftype);
+}
+
+llvm::FunctionCallee Lifter::GetExclusiveMonitorUntagTrampoline(Instance& rinst) {
+    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty()}, false);
+    return rinst.module->getOrInsertFunction("ExclusiveMonitorUntagTrampoline", ftype);
+}
+
+llvm::FunctionCallee Lifter::GetExclusiveMonitorPoisonTrampoline(Instance& rinst) {
+    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty()}, false);
+    return rinst.module->getOrInsertFunction("ExclusiveMonitorPoisonTrampoline", ftype);
+}
+
+llvm::FunctionCallee Lifter::GetExclusiveMonitorIsPoisonedTrampoline(Instance& rinst) {
+    const auto ftype = llvm::FunctionType::get(rinst.builder->getInt8Ty(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty()}, false);
+    return rinst.module->getOrInsertFunction("ExclusiveMonitorIsPoisonedTrampoline", ftype);
 }
 
 #ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
