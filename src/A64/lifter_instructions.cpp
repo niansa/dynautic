@@ -4,6 +4,10 @@
 #include "runtime.hpp"
 #include "../llvm.hpp"
 
+#ifdef __aarch64__
+#include <llvm/IR/IntrinsicsAArch64.h>
+#endif
+
 using namespace llvm;
 using namespace llvm::orc;
 
@@ -528,20 +532,25 @@ bool Lifter::InstructionLifter::Run() {
         case AArch64_INS_CAS:
         case AArch64_INS_CASA:
         case AArch64_INS_CASL:
-        case AArch64_INS_CASAL: { //TODO: Untested!
+        case AArch64_INS_CASAL: {
             AtomicOrdering ordering;
             switch (id) {
-            case AArch64_INS_CAS: ordering = AtomicOrdering::NotAtomic; break;
+            case AArch64_INS_CAS: ordering = AtomicOrdering::Monotonic; break;
             case AArch64_INS_CASA: ordering = AtomicOrdering::Acquire; break;
             case AArch64_INS_CASL: ordering = AtomicOrdering::Release; break;
             case AArch64_INS_CASAL: ordering = AtomicOrdering::AcquireRelease; break;
             }
 
-            const auto ops = GetOps(2);
-            Type *type = rinst.GetType(ops[0].size);
-            Value *reference = GetMemOpReference(false, 2);
-            Value *result = rinst.builder->CreateAtomicCmpXchg(reference, p.GetRegisterView(rinst, ops[0]), p.GetRegisterView(rinst, ops[1]), MaybeAlign(), ordering, ordering);
-            p.StoreRegister(rinst, ops[0], result);
+            if (p.rt.conf.native_memory) {
+                const auto ops = GetOps(2);
+                Value *reference = GetMemOpReference(false, 2);
+                reference = rinst.builder->CreateIntToPtr(reference, rinst.builder->getPtrTy());
+                Value *result = rinst.builder->CreateAtomicCmpXchg(reference, p.GetRegisterView(rinst, ops[0]), p.GetRegisterView(rinst, ops[1]), MaybeAlign(), ordering, AtomicOrdering::Monotonic);
+                result = rinst.builder->CreateExtractValue(result, 0);
+                p.StoreRegister(rinst, ops[0], result);
+            } else {
+                //TODO
+            }
         } return;
         // Branch instructions
         case AArch64_INS_BL: {
