@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <memory>
 #include <mutex>
+#include <thread>
 #include <cstdint>
 #include <csignal>
 
@@ -23,11 +24,13 @@ class GlobalMonitor {
     struct Tag {
         size_t processor_id;
         bool poisoned = false;
+        std::thread::id thread_id;
 
         std::mutex conditional_mutex{};
         std::condition_variable conditional_lock{};
 
-        Tag(size_t processor_id) : processor_id(processor_id) {}
+        Tag(size_t processor_id)
+              : processor_id(processor_id), thread_id(std::this_thread::get_id()) {}
     };
 
     std::unordered_map<Addr, Tag> tags;

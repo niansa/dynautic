@@ -112,9 +112,7 @@ void GlobalMonitor::Create(uint8_t system_id, bool native) {
     if (monitors.size() <= system_id)
         monitors.resize(system_id+1);
 
-    auto& mon = monitors[system_id];
-    if (!mon)
-        mon = std::make_unique<GlobalMonitor>(native);
+    monitors[system_id] = std::make_unique<GlobalMonitor>(native);
 }
 
 GlobalMonitor &GlobalMonitor::Get(uint8_t system_id) {
@@ -123,7 +121,8 @@ GlobalMonitor &GlobalMonitor::Get(uint8_t system_id) {
 }
 
 void GlobalMonitor::Tag(Addr addr, size_t processor_id) {
-    addr = GetPageAddr(addr);
+    if (native)
+        addr = GetPageAddr(addr);
     std::scoped_lock L(mutex);
 
     // Check for existing tag
@@ -144,7 +143,8 @@ void GlobalMonitor::Tag(Addr addr, size_t processor_id) {
 }
 
 bool GlobalMonitor::Poison(Addr addr) {
-    addr = GetPageAddr(addr);
+    if (native)
+        addr = GetPageAddr(addr);
     std::scoped_lock L(mutex);
 
     // Find tag
@@ -152,8 +152,8 @@ bool GlobalMonitor::Poison(Addr addr) {
     if (tag == tags.end())
         return false;
 
-    // Wait until untagged if native memory
-    if (native) {
+    // Wait until untagged if native memory and different thread
+    if (native && tag->second.thread_id != std::this_thread::get_id()) {
         std::unique_lock<std::mutex> lock(tag->second.conditional_mutex);
         tag->second.conditional_lock.wait(lock);
         // Avoid race
@@ -163,16 +163,17 @@ bool GlobalMonitor::Poison(Addr addr) {
 
     // Poison tag
     tag->second.poisoned = true;
+
+    // Revert memory protection if native
+    if (native)
+        UnprotectPage(addr);
+
     return true;
 }
 
 bool GlobalMonitor::IsPoinsoned(Addr addr, size_t processor_id) {
-    addr = GetPageAddr(addr);
-
-    // Will never be poisoned with native memory
     if (native)
-        return false;
-
+        addr = GetPageAddr(addr);
     std::scoped_lock L(mutex);
 
     // Find tag
@@ -189,7 +190,8 @@ bool GlobalMonitor::IsPoinsoned(Addr addr, size_t processor_id) {
 }
 
 void GlobalMonitor::Untag(Addr addr, size_t processor_id) {
-    addr = GetPageAddr(addr);
+    if (!native)
+        addr = GetPageAddr(addr);
     std::scoped_lock L(mutex);
 
     // Find tag
