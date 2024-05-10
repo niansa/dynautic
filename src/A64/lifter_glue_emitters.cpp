@@ -317,6 +317,10 @@ void Lifter::CreateFreezeTrampoline(Instance& rinst) {
 }
 
 void Lifter::CreateExclusiveMonitorTagTrampoline(Instance& rinst, llvm::Value *addr) {
+    #ifdef __aarch64__
+    DYNAUTIC_ASSERT(!rt.conf.native_memory);
+    #endif
+
     if (rt_values.exclusive_monitor)
         CreateExclusiveMonitorUntagTrampoline(rinst, rt_values.exclusive_monitor);
 
