@@ -15,11 +15,36 @@ std::vector<std::unique_ptr<GlobalMonitor>> GlobalMonitor::monitors;
 std::mutex GlobalMonitor::monitors_mutex{};
 
 
+namespace {
+#ifdef ____GNUC__
+#pragma GCC push_options
+#pragma GCC optimize ("O0")
+#endif
+
+__attribute__ ((optnone))
+int WasteTime() {
+    static int value = 0;
+    ++value;
+    ++value;
+    ++value;
+    ++value;
+    ++value;
+    return value;
+}
+
+#ifdef ____GNUC__
+#pragma GCC pop_options
+#endif
+}
+
+
 Addr GlobalMonitor::GetPageAddr(Addr addr) {
     return (addr / page_size) * page_size;
 }
 
 void GlobalMonitor::ProtectPage(Addr addr) {
+    int dummy;
+    DYNAUTIC_ASSERT(GetPageAddr(reinterpret_cast<Addr>(&dummy)) != addr);
     bool mprotect_error = mprotect(reinterpret_cast<void*>(addr), page_size, PROT_READ|PROT_EXEC);
     DYNAUTIC_ASSERT(!mprotect_error);
 }
@@ -31,6 +56,7 @@ void GlobalMonitor::UnprotectPage(Addr addr) {
 }
 
 void GlobalMonitor::ProtectionFaultHandler(int, siginfo_t *info, void *) noexcept {
+    DYNAUTIC_ASSERT(info->si_addr != 0);
     bool handled = false;
     // Make sure monitors mutex was able to be locked
     bool locked = monitors_mutex.try_lock();
@@ -130,6 +156,8 @@ bool GlobalMonitor::Poison(Addr addr) {
     if (native) {
         std::unique_lock<std::mutex> lock(tag->second.conditional_mutex);
         tag->second.conditional_lock.wait(lock);
+        // Avoid race
+        WasteTime();
         return true;
     }
 
@@ -173,15 +201,13 @@ void GlobalMonitor::Untag(Addr addr, size_t processor_id) {
     if (tag->second.processor_id != processor_id)
         return;
 
-    // Notify waiters if native memory
-    if (native)
-        tag->second.conditional_lock.notify_all();
-
     // Erase tag
     tags.erase(tag);
 
-    // Revert memory protection if native memory
-    if (native)
+    // Revert memory protection and notify waiters if native memory
+    if (native) {
         UnprotectPage(addr);
+        tag->second.conditional_lock.notify_all();
+    }
 }
 } // namespace Dynautic

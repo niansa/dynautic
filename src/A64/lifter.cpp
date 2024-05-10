@@ -139,7 +139,7 @@ void Lifter::LiftLeaf(Instance& rinst, VAddr addr) {
     VAddr last_addr = addr;
     std::vector<VAddr> noexec_addrs;
 
-    CreateRegisterRestore(rinst);
+    LoadContext(rinst);
 
     // Lift instructions in blocks
     std::array<uint8_t, 0x100> block;

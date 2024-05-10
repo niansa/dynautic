@@ -99,15 +99,15 @@ class Lifter {
     llvm::Value *PerformShift(Instance&, llvm::Value *, aarch64_shifter type, uint8_t shift);
     uint64_t PerformShift(uint64_t, uint8_t bits, aarch64_shifter type, uint8_t shift);
 
-    void CreateRegisterRestore(Instance&);
-    void CreateRegisterSave(Instance&);
+    void LoadContext(Instance&);
+    void FinalizeContext(Instance&);
     void CreatePCSave(Instance&);
 
     static llvm::Value *CreateLoadFromPtr(Instance& rinst, void *, llvm::Type *type, const llvm::Twine& name = "");
     static void CreateStoreToPtr(Instance& rinst, void *, llvm::Value *value);
 
     llvm::Value *CreateMemoryLoad(Instance&, llvm::Value *address, llvm::Type *);
-    void CreateMemoryStore(Instance&, llvm::Value *address, llvm::Value *data);
+    void CreateMemoryStore(Instance&, llvm::Value *address, llvm::Value *data, bool volatile_ = false);
 
     void CreateCall(Instance&, VAddr origin, llvm::Value *address, bool no_cache = false);
     void CreateCall(Instance&, VAddr origin, VAddr address);

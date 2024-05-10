@@ -585,6 +585,62 @@ bool Lifter::InstructionLifter::Run() {
                 p.StoreRegister(rinst, ops[0], value);
             }
         } return;
+        case AArch64_INS_LDXR: {
+            const auto op = GetOps(1)[0];
+            Value *reference = GetMemOpReference(false, 1);
+
+            if (!p.rt.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)) {
+                #ifdef __aarch64__
+                if (p.rt.conf.native_memory) {
+                    reference = rinst.builder->CreateIntToPtr(reference, rinst.builder->getPtrTy());
+                    Value *result = rinst.builder->CreateIntrinsic(rinst.GetType(op.size), Intrinsic::aarch64_ldxr, {reference});
+                    p.StoreRegister(rinst, op, result);
+                    return;
+                } else {
+                #endif
+                // Tag memory location
+                p.CreateExclusiveMonitorTagTrampoline(rinst, reference);
+                #ifdef __aarch64__
+                }
+                #endif
+            }
+            // Load into register
+            p.StoreRegister(rinst, op, p.CreateMemoryLoad(rinst, reference, rinst.GetType(op.size)));
+        } return;
+        case AArch64_INS_STXR: {
+            const auto ops = GetOps(2);
+            Value *reference = GetMemOpReference(false, 2);
+
+            if (!p.rt.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)) {
+                #ifdef __aarch64__
+                if (p.rt.conf.native_memory) {
+                    reference = rinst.builder->CreateIntToPtr(reference, rinst.builder->getPtrTy());
+                    Value *result = rinst.builder->CreateIntrinsic(rinst.builder->getInt32Ty(), Intrinsic::aarch64_stxr, {p.GetRegisterView(rinst, ops[1]), reference});
+                    p.StoreRegister(rinst, ops[0], result);
+                } else {
+                #endif
+                // Check for poison
+                Value *poisoned = p.CreateExclusiveMonitorIsPoisonedTrampoline(rinst, reference);
+                // Untag memory
+                p.CreateExclusiveMonitorUntagTrampoline(rinst, reference);
+                // Store if not poisoned
+                BasicBlock *no_poison_branch = rinst.CreateBasicBlock("NoPoisonStoreBranch");
+                BasicBlock *continue_branch = rinst.CreateBasicBlock("NoPoisonStoreContinue");
+                rinst.builder->CreateCondBr(poisoned, continue_branch, no_poison_branch);
+                rinst.UseBasicBlock(no_poison_branch);
+                p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[1]), true);
+                rinst.builder->CreateBr(continue_branch);
+                rinst.UseBasicBlock(continue_branch);
+                // Store result in register
+                p.StoreRegister(rinst, ops[0], rinst.builder->CreateSelect(poisoned, rinst.builder->getInt32(1), rinst.builder->getInt32(0)));
+                #ifdef __aarch64__
+                }
+                #endif
+            } else {
+                p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[1]), true);
+                p.StoreRegister(rinst, ops[0], rinst.builder->getInt32(0));
+            }
+        } return;
         // Branch instructions
         case AArch64_INS_BL: {
             // Use BLR implementation if address is immediate
@@ -616,7 +672,7 @@ bool Lifter::InstructionLifter::Run() {
         } return;
         case AArch64_INS_CBNZ: extra_flags[0] = true; [[fallthrough]];
         case AArch64_INS_CBZ: {
-            p.CreateRegisterSave(rinst);
+            p.FinalizeContext(rinst);
             const VAddr false_addr = insn.address+4;
             const auto pred = extra_flags[0]?ICmpInst::ICMP_NE:ICmpInst::ICMP_EQ;
             Value *cond = rinst.builder->CreateICmp(pred, rinst.builder->CreateIntCast(p.GetRegisterView(rinst, GetOps(1)[0]), rinst.builder->getInt64Ty(), false), rinst.builder->getInt64(0));
@@ -625,7 +681,7 @@ bool Lifter::InstructionLifter::Run() {
         case AArch64_INS_TBNZ: extra_flags[0] = true; [[fallthrough]];
         case AArch64_INS_TBZ: {
             const auto ops = GetOps(2);
-            p.CreateRegisterSave(rinst);
+            p.FinalizeContext(rinst);
             const VAddr false_addr = insn.address+4;
             Value *value = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[0]), rinst.builder->CreateShl(ConstantInt::get(rinst.GetType(ops[0].size), 1), p.GetRegisterView(rinst, ops[1])));
             const auto pred = extra_flags[0]?ICmpInst::ICMP_NE:ICmpInst::ICMP_EQ;
