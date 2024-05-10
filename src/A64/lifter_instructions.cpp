@@ -714,7 +714,7 @@ bool Lifter::InstructionLifter::Run() {
                 rinst.builder->CreateCondBr(poisoned, continue_branch, no_poison_branch);
                 rinst.UseBasicBlock(no_poison_branch);
                 p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[1]));
-                reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
+                reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[1].size/8));
                 p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[2]));
                 rinst.builder->CreateBr(continue_branch);
                 rinst.UseBasicBlock(continue_branch);
