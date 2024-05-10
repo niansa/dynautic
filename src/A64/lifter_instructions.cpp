@@ -19,8 +19,9 @@ uint64_t Lifter::InstructionLifter::GetImm(const cs_aarch64_op& op) {
     switch (op.type) {
     case AArch64_OP_IMM: return static_cast<uint64_t>(op.imm);
     case AArch64_OP_FP: return *reinterpret_cast<const uint64_t *>(&op.fp);
-    default: assert(!"Unsupported immediate type");
+    default: DYNAUTIC_ASSERT(!"Unsupported immediate type");
     }
+    return 0;
 }
 
 uint16_t Lifter::InstructionLifter::GetImm16WithShift(uint64_t value) {
@@ -169,11 +170,11 @@ uint8_t Lifter::InstructionLifter::GetLoadStoreFlagsAndSize(uint64_t insn_id) {
     case AArch64_INS_ALIAS_STURH:
     case AArch64_INS_STURH:
     case AArch64_INS_ALIAS_LDURH:
-    case AArch64_INS_LDURH: extra_flags[unscaled] = extra_flags[half] = true; break;
+    case AArch64_INS_LDURH: extra_flags[unscaled] = extra_flags[half_word] = true; break;
     case AArch64_INS_ALIAS_LDURSB:
     case AArch64_INS_LDURSB: extra_flags[unscaled] = extra_flags[signed_] = extra_flags[byte] = true; break;
     case AArch64_INS_ALIAS_LDURSH:
-    case AArch64_INS_LDURSH: extra_flags[unscaled] = extra_flags[signed_] = extra_flags[half] = true; break;
+    case AArch64_INS_LDURSH: extra_flags[unscaled] = extra_flags[signed_] = extra_flags[half_word] = true; break;
     case AArch64_INS_ALIAS_LDURSW:
     case AArch64_INS_LDURSW: extra_flags[unscaled] = extra_flags[signed_] = extra_flags[word] = true; break;
     case AArch64_INS_ALIAS_STUR:
@@ -186,6 +187,15 @@ uint8_t Lifter::InstructionLifter::GetLoadStoreFlagsAndSize(uint64_t insn_id) {
     case AArch64_INS_LDRB: extra_flags[byte] = true; break;
     case AArch64_INS_ALIAS_LDRSW:
     case AArch64_INS_LDRSW: extra_flags[signed_] = extra_flags[word] = true; break;
+    case AArch64_INS_STXR:
+    case AArch64_INS_LDXR: extra_flags[exclusive] = true; break;
+    case AArch64_INS_STXRB:
+    case AArch64_INS_LDXRB: extra_flags[byte] = extra_flags[exclusive] = true; break;
+    case AArch64_INS_STXRH:
+    case AArch64_INS_LDXRH: extra_flags[half_word] = extra_flags[exclusive] = true; break;
+    case AArch64_INS_STLXR: extra_flags[exclusive] = extra_flags[release] = true; break;
+    case AArch64_INS_STLXRB: extra_flags[byte] = extra_flags[exclusive] = extra_flags[release] = true; break;
+    case AArch64_INS_STLXRH: extra_flags[half_word] = extra_flags[exclusive] = extra_flags[release] = true; break;
     case AArch64_INS_ALIAS_STR:
     case AArch64_INS_STR:
     case AArch64_INS_ALIAS_LDR:
@@ -193,7 +203,7 @@ uint8_t Lifter::InstructionLifter::GetLoadStoreFlagsAndSize(uint64_t insn_id) {
     default: DYNAUTIC_ASSERT(!"Unknown load/store instruction");
     }
 
-    return extra_flags[byte]?8:extra_flags[half]?16:extra_flags[word]?32:0;
+    return extra_flags[byte]?8:extra_flags[half_word]?16:extra_flags[word]?32:0;
 }
 
 void Lifter::InstructionLifter::DeferCompilation(bool repeat_instruction) {
@@ -455,7 +465,7 @@ bool Lifter::InstructionLifter::Run() {
             const auto ops = GetOps(2);
             p.StoreRegister(rinst, ops[0], p.GetRegisterView(rinst, ops[1]));
         } return;
-        // Load and store instructions
+        // Load, store and atomic load instructions
         case AArch64_INS_ALIAS_LDURB:
         case AArch64_INS_LDURB:
         case AArch64_INS_ALIAS_LDURH:
@@ -473,11 +483,33 @@ bool Lifter::InstructionLifter::Run() {
         case AArch64_INS_ALIAS_LDRSW:
         case AArch64_INS_LDRSW:
         case AArch64_INS_ALIAS_LDR:
-        case AArch64_INS_LDR: {
+        case AArch64_INS_LDR:
+        case AArch64_INS_LDXR:
+        case AArch64_INS_LDXRB:
+        case AArch64_INS_LDXRH: {
             const uint8_t msiz = GetLoadStoreFlagsAndSize(id);
 
             const auto op = GetOps(1)[0];
             Value *reference = GetMemOpReference(extra_flags[0]);
+
+            if (extra_flags[exclusive] && !p.rt.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)) {
+                #ifdef __aarch64__
+                if (p.rt.conf.native_memory) {
+                    Type *type = rinst.GetType(msiz?msiz:op.size);
+                    reference = rinst.builder->CreateIntToPtr(reference, rinst.builder->getPtrTy());
+                    CallInst *result = rinst.builder->CreateIntrinsic(type, Intrinsic::aarch64_ldxr, {reference});
+                    result->addParamAttr(0, Attribute::get(*rinst.context, Attribute::ElementType, type));
+                    p.StoreRegister(rinst, op, result);
+                    return;
+                } else {
+                #endif
+                // Tag memory location
+                p.CreateExclusiveMonitorTagTrampoline(rinst, reference);
+                #ifdef __aarch64__
+                }
+                #endif
+            }
+
             Value *value = p.CreateMemoryLoad(rinst, reference, rinst.GetType(msiz?msiz:op.size));
             if (msiz)
                 value = rinst.builder->CreateIntCast(value, rinst.GetType(op.size), extra_flags[signed_]);
@@ -511,11 +543,32 @@ bool Lifter::InstructionLifter::Run() {
             reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
             p.StoreRegister(rinst, ops[1], rinst.builder->CreateIntCast(p.CreateMemoryLoad(rinst, reference, rinst.builder->getInt32Ty()), type, true));
         } return;
+        case AArch64_INS_LDXP: extra_flags[exclusive] = true; [[fallthrough]];
         case AArch64_INS_ALIAS_LDP:
         case AArch64_INS_LDP: {
             const auto ops = GetOps(2);
             Type *type = rinst.GetType(ops[0].size);
             Value *reference = GetMemOpReference(false, 2);
+
+            if (extra_flags[exclusive] && !p.rt.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)) {
+                #ifdef __aarch64__
+                if (p.rt.conf.native_memory) {
+                    Type *type = rinst.GetType(ops[0].size);
+                    reference = rinst.builder->CreateIntToPtr(reference, rinst.builder->getPtrTy());
+                    CallInst *result = rinst.builder->CreateIntrinsic(type, Intrinsic::aarch64_ldxp, {reference});
+                    result->addParamAttr(0, Attribute::get(*rinst.context, Attribute::ElementType, type));
+                    p.StoreRegister(rinst, ops[0], rinst.builder->CreateExtractValue(result, 0));
+                    p.StoreRegister(rinst, ops[1], rinst.builder->CreateExtractValue(result, 1));
+                    return;
+                } else {
+                #endif
+                // Tag memory location
+                p.CreateExclusiveMonitorTagTrampoline(rinst, reference);
+                #ifdef __aarch64__
+                }
+                #endif
+            }
+
             p.StoreRegister(rinst, ops[0], p.CreateMemoryLoad(rinst, reference, type));
             reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
             p.StoreRegister(rinst, ops[1], p.CreateMemoryLoad(rinst, reference, type));
@@ -528,7 +581,7 @@ bool Lifter::InstructionLifter::Run() {
             reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
             p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[1]));
         } return;
-        // Atomic load and store instructions
+        // Atomic store instructions
         case AArch64_INS_CAS:
         case AArch64_INS_CASA:
         case AArch64_INS_CASL:
@@ -585,33 +638,20 @@ bool Lifter::InstructionLifter::Run() {
                 p.StoreRegister(rinst, ops[0], value);
             }
         } return;
-        case AArch64_INS_LDXR: {
-            const auto op = GetOps(1)[0];
-            Value *reference = GetMemOpReference(false, 1);
+        case AArch64_INS_STXR:
+        case AArch64_INS_STXRB:
+        case AArch64_INS_STXRH:
+        case AArch64_INS_STLXR:
+        case AArch64_INS_STLXRB:
+        case AArch64_INS_STLXRH: {
+            const uint8_t msiz = GetLoadStoreFlagsAndSize(id);
 
-            if (!p.rt.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)) {
-                #ifdef __aarch64__
-                if (p.rt.conf.native_memory) {
-                    Type *type = rinst.GetType(op.size);
-                    reference = rinst.builder->CreateIntToPtr(reference, rinst.builder->getPtrTy());
-                    CallInst *result = rinst.builder->CreateIntrinsic(type, Intrinsic::aarch64_ldxr, {reference});
-                    result->addParamAttr(0, Attribute::get(*rinst.context, Attribute::ElementType, type));
-                    p.StoreRegister(rinst, op, result);
-                    return;
-                } else {
-                #endif
-                // Tag memory location
-                p.CreateExclusiveMonitorTagTrampoline(rinst, reference);
-                #ifdef __aarch64__
-                }
-                #endif
-            }
-            // Load into register
-            p.StoreRegister(rinst, op, p.CreateMemoryLoad(rinst, reference, rinst.GetType(op.size)));
-        } return;
-        case AArch64_INS_STXR: {
             const auto ops = GetOps(2);
             Value *reference = GetMemOpReference(false, 2);
+            Value *value = p.GetRegisterView(rinst, ops[1]);
+
+            if (msiz)
+                value = rinst.builder->CreateIntCast(value, rinst.GetType(msiz), extra_flags[signed_]);
 
             if (!p.rt.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)) {
                 #ifdef __aarch64__
@@ -631,7 +671,7 @@ bool Lifter::InstructionLifter::Run() {
                 BasicBlock *continue_branch = rinst.CreateBasicBlock("NoPoisonStoreContinue");
                 rinst.builder->CreateCondBr(poisoned, continue_branch, no_poison_branch);
                 rinst.UseBasicBlock(no_poison_branch);
-                p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[1]), true);
+                p.CreateMemoryStore(rinst, reference, value, true);
                 rinst.builder->CreateBr(continue_branch);
                 rinst.UseBasicBlock(continue_branch);
                 // Store result in register
@@ -640,8 +680,51 @@ bool Lifter::InstructionLifter::Run() {
                 }
                 #endif
             } else {
-                p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[1]), true);
+                p.CreateMemoryStore(rinst, reference, value, true);
                 p.StoreRegister(rinst, ops[0], rinst.builder->getInt32(0));
+            }
+        } return;
+        case AArch64_INS_STLXP:
+        case AArch64_INS_STXP: {
+            const auto ops = GetOps(3);
+            Value *reference = GetMemOpReference(false, 3);
+            if (!p.rt.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)) {
+                #ifdef __aarch64__
+                if (p.rt.conf.native_memory) {
+                    reference = rinst.builder->CreateIntToPtr(reference, rinst.builder->getPtrTy());
+                    Intrinsic::ID intr;
+                    switch (id) {
+                    case AArch64_INS_STLXP: intr = Intrinsic::aarch64_stlxp; break;
+                    case AArch64_INS_STXP: intr = Intrinsic::aarch64_stxp; break;
+                    }
+                    CallInst *result = rinst.builder->CreateIntrinsic(rinst.builder->getInt32Ty(), intr, {p.GetRegisterView(rinst, ops[1]), p.GetRegisterView(rinst, ops[2]), reference});
+                    result->addParamAttr(2, Attribute::get(*rinst.context, Attribute::ElementType, rinst.GetType(ops[1].size)));
+                    p.StoreRegister(rinst, ops[0], result);
+                } else {
+                #endif
+                // Check for poison
+                Value *poisoned = p.CreateExclusiveMonitorIsPoisonedTrampoline(rinst, reference);
+                // Untag memory
+                p.CreateExclusiveMonitorUntagTrampoline(rinst, reference);
+                // Store if not poisoned
+                BasicBlock *no_poison_branch = rinst.CreateBasicBlock("NoPoisonStoreBranch");
+                BasicBlock *continue_branch = rinst.CreateBasicBlock("NoPoisonStoreContinue");
+                rinst.builder->CreateCondBr(poisoned, continue_branch, no_poison_branch);
+                rinst.UseBasicBlock(no_poison_branch);
+                p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[1]));
+                reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
+                p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[2]));
+                rinst.builder->CreateBr(continue_branch);
+                rinst.UseBasicBlock(continue_branch);
+                // Store result in register
+                p.StoreRegister(rinst, ops[0], rinst.builder->CreateSelect(poisoned, rinst.builder->getInt32(1), rinst.builder->getInt32(0)));
+                #ifdef __aarch64__
+                }
+                #endif
+            } else {
+                p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[0]));
+                reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
+                p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[1]));
             }
         } return;
         // Branch instructions

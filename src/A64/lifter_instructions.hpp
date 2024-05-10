@@ -53,8 +53,10 @@ class Lifter::InstructionLifter {
         unscaled,
         signed_,
         byte,
-        half,
-        word
+        half_word,
+        word,
+        exclusive,
+        release
     };
     uint8_t GetLoadStoreFlagsAndSize(uint64_t insn_id);
 
