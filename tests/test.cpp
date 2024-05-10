@@ -284,6 +284,14 @@ int main(int argc, char** argv) {
                       0xd65f03c0  // ret
                   }, reference);
 
+    dynautic->RunTest("Load and store with exclusive monitor", {
+                      0xc85f7f01, // ldxr x1, [x24]
+                      0x91001c21, // add x1, x1, #0x7
+                      0xc8037f01, // stxr w3, x1, [x24]
+                      0x8b030021, // add x1, x1, x3
+                      0xd65f03c0  // ret
+                  }, reference);
+
     for (const auto& entry : std::filesystem::directory_iterator(TEST_BINS)) {
         if (!entry.is_regular_file())
             continue;
