@@ -21,7 +21,9 @@ namespace {
 #pragma GCC optimize ("O0")
 #endif
 
-__attribute__ ((optnone))
+#ifdef __clang__
+[[clang::optnone]]
+#endif
 int WasteTime() {
     static int value = 0;
     ++value;
