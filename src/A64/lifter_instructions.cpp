@@ -568,9 +568,11 @@ bool Lifter::InstructionLifter::Run() {
                 #endif
             }
 
-            p.StoreRegister(rinst, ops[0], p.CreateMemoryLoad(rinst, reference, type));
-            reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
-            p.StoreRegister(rinst, ops[1], p.CreateMemoryLoad(rinst, reference, type));
+            const uint8_t bsiz = ops[0].size/8;
+            const uint8_t alignment = extra_flags[exclusive]?bsiz:0;
+            p.StoreRegister(rinst, ops[0], p.CreateMemoryLoad(rinst, reference, type, alignment*2));
+            reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(bsiz));
+            p.StoreRegister(rinst, ops[1], p.CreateMemoryLoad(rinst, reference, type, alignment));
         } return;
         case AArch64_INS_ALIAS_STP:
         case AArch64_INS_STP: {

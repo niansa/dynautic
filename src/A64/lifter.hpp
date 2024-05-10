@@ -106,8 +106,8 @@ class Lifter {
     static llvm::Value *CreateLoadFromPtr(Instance& rinst, void *, llvm::Type *type, const llvm::Twine& name = "");
     static void CreateStoreToPtr(Instance& rinst, void *, llvm::Value *value);
 
-    llvm::Value *CreateMemoryLoad(Instance&, llvm::Value *address, llvm::Type *);
-    void CreateMemoryStore(Instance&, llvm::Value *address, llvm::Value *data, bool volatile_ = false);
+    llvm::Value *CreateMemoryLoad(Instance&, llvm::Value *address, llvm::Type *, uint8_t alignment = 0);
+    void CreateMemoryStore(Instance&, llvm::Value *address, llvm::Value *data, bool volatile_ = false, uint8_t alignment = 0);
 
     void CreateCall(Instance&, VAddr origin, llvm::Value *address, bool no_cache = false);
     void CreateCall(Instance&, VAddr origin, VAddr address);

@@ -105,9 +105,9 @@ void Lifter::CreateStoreToPtr(Instance& rinst, void *ptr, llvm::Value *value) {
     rinst.builder->CreateStore(value, rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<uint64_t>(ptr)), rinst.builder->getPtrTy()));
 }
 
-Value *Lifter::CreateMemoryLoad(Instance& rinst, llvm::Value *address, Type *type) {
+Value *Lifter::CreateMemoryLoad(Instance& rinst, llvm::Value *address, Type *type, uint8_t alignment) {
     if (rt.conf.native_memory)
-        return rinst.builder->CreateLoad(type, rinst.builder->CreateIntToPtr(address, rinst.builder->getPtrTy()));
+        return rinst.builder->CreateAlignedLoad(type, rinst.builder->CreateIntToPtr(address, rinst.builder->getPtrTy()), MaybeAlign(alignment));
 
     Value *runtime = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
     Value *fres = rinst.builder->CreateCall(GetMemoryRead(rinst, static_cast<uint8_t>(type->getIntegerBitWidth())), {runtime, address});
@@ -116,9 +116,9 @@ Value *Lifter::CreateMemoryLoad(Instance& rinst, llvm::Value *address, Type *typ
     return fres;
 }
 
-void Lifter::CreateMemoryStore(Instance& rinst, llvm::Value *address, llvm::Value *data, bool volatile_) {
+void Lifter::CreateMemoryStore(Instance& rinst, llvm::Value *address, llvm::Value *data, bool volatile_, uint8_t alignment) {
     if (rt.conf.native_memory) {
-        rinst.builder->CreateStore(data, rinst.builder->CreateIntToPtr(address, rinst.builder->getPtrTy()), volatile_);
+        rinst.builder->CreateAlignedStore(data, rinst.builder->CreateIntToPtr(address, rinst.builder->getPtrTy()), MaybeAlign(alignment), volatile_);
         return;
     }
 
