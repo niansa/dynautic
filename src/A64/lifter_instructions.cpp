@@ -592,8 +592,10 @@ bool Lifter::InstructionLifter::Run() {
             if (!p.rt.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)) {
                 #ifdef __aarch64__
                 if (p.rt.conf.native_memory) {
+                    Type *type = rinst.GetType(op.size);
                     reference = rinst.builder->CreateIntToPtr(reference, rinst.builder->getPtrTy());
-                    Value *result = rinst.builder->CreateIntrinsic(rinst.GetType(op.size), Intrinsic::aarch64_ldxr, {reference});
+                    CallInst *result = rinst.builder->CreateIntrinsic(type, Intrinsic::aarch64_ldxr, {reference});
+                    result->addParamAttr(0, Attribute::get(*rinst.context, Attribute::ElementType, type));
                     p.StoreRegister(rinst, op, result);
                     return;
                 } else {
@@ -615,7 +617,8 @@ bool Lifter::InstructionLifter::Run() {
                 #ifdef __aarch64__
                 if (p.rt.conf.native_memory) {
                     reference = rinst.builder->CreateIntToPtr(reference, rinst.builder->getPtrTy());
-                    Value *result = rinst.builder->CreateIntrinsic(rinst.builder->getInt32Ty(), Intrinsic::aarch64_stxr, {p.GetRegisterView(rinst, ops[1]), reference});
+                    CallInst *result = rinst.builder->CreateIntrinsic(rinst.builder->getInt32Ty(), Intrinsic::aarch64_stxr, {p.GetRegisterView(rinst, ops[1]), reference});
+                    result->addParamAttr(1, Attribute::get(*rinst.context, Attribute::ElementType, rinst.GetType(ops[1].size)));
                     p.StoreRegister(rinst, ops[0], result);
                 } else {
                 #endif
