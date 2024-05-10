@@ -203,6 +203,9 @@ void GlobalMonitor::Untag(Addr addr, size_t processor_id) {
     if (tag->second.processor_id != processor_id)
         return;
 
+    // Make sure we're still on the same thread
+    DYNAUTIC_ASSERT(tag->second.thread_id == std::this_thread::get_id());
+
     // Erase tag
     tags.erase(tag);
 
