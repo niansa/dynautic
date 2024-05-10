@@ -68,7 +68,7 @@ Runtime::Impl::Impl(UserConfig conf_, Runtime *parent)
     // Enforce configuration restraints
     if (!conf.unsafe_optimizations) {
         conf.fully_static = false;
-        conf.optimizations &= all_safe_optimizations;
+        conf.optimizations &= ~all_safe_optimizations;
     }
     conf.use_cache = conf.use_cache && conf.HasOptimization(OptimizationFlag::BlockLinking);
     conf.fully_static = conf.fully_static && conf.use_cache;
