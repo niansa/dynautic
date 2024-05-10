@@ -656,8 +656,9 @@ bool Lifter::InstructionLifter::Run() {
                 #ifdef __aarch64__
                 if (p.rt.conf.native_memory) {
                     reference = rinst.builder->CreateIntToPtr(reference, rinst.builder->getPtrTy());
-                    CallInst *result = rinst.builder->CreateIntrinsic(Intrinsic::aarch64_stxr, {rinst.builder->getInt32Ty(), rinst.GetType(ops[1].size), rinst.builder->getPtrTy()}, {p.GetRegisterView(rinst, ops[1]), reference});
-                    result->addParamAttr(1, Attribute::get(*rinst.context, Attribute::ElementType, rinst.GetType(ops[1].size)));
+                    Value *value = rinst.builder->CreateZExt(p.GetRegisterView(rinst, ops[1]), rinst.builder->getInt64Ty());
+                    CallInst *result = rinst.builder->CreateIntrinsic(Intrinsic::aarch64_stxr, {rinst.builder->getPtrTy()}, {value, reference});
+                    result->addParamAttr(1, Attribute::get(*rinst.context, Attribute::ElementType, rinst.GetType(msiz?msiz:ops[1].size)));
                     p.StoreRegister(rinst, ops[0], result);
                 } else {
                 #endif
