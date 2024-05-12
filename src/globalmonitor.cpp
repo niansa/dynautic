@@ -114,7 +114,11 @@ void GlobalMonitor::Create(uint8_t system_id, bool native) {
     if (monitors.size() <= system_id)
         monitors.resize(system_id+1);
 
-    monitors[system_id] = std::make_unique<GlobalMonitor>(native);
+    auto& monitor = monitors[system_id];
+    if (!monitor)
+        monitor = std::make_unique<GlobalMonitor>(native);
+    else
+        monitor->native = native;
 }
 
 GlobalMonitor &GlobalMonitor::Get(uint8_t system_id) {
@@ -127,15 +131,6 @@ void GlobalMonitor::Tag(Addr addr, size_t processor_id) {
         addr = GetPageAddr(addr);
     std::scoped_lock L(mutex);
 
-    // Check for existing tag
-    auto existing_tag = tags.find(addr);
-    if (existing_tag != tags.end()) {
-        // Update tag to current processor ID and reset poison
-        existing_tag->second.processor_id = processor_id;
-        existing_tag->second.poisoned = false;
-        return;
-    }
-
     // Create new tag
     tags.emplace(addr, processor_id);
 
@@ -147,7 +142,7 @@ void GlobalMonitor::Tag(Addr addr, size_t processor_id) {
 bool GlobalMonitor::Poison(Addr addr) {
     if (native)
         addr = GetPageAddr(addr);
-    std::scoped_lock L(mutex);
+    std::optional<std::scoped_lock<std::mutex>> L(mutex);
 
     // Find tag
     auto tag = tags.find(addr);
@@ -156,6 +151,9 @@ bool GlobalMonitor::Poison(Addr addr) {
 
     // Wait until untagged if native memory and different thread
     if (native && tag->second.thread_id != std::this_thread::get_id()) {
+        // Unlock mutex
+        L.reset();
+        // Wait for conditional lock
         std::unique_lock<std::mutex> lock(tag->second.conditional_mutex);
         tag->second.conditional_lock.wait(lock);
         // Avoid race
@@ -192,7 +190,7 @@ bool GlobalMonitor::IsPoinsoned(Addr addr, size_t processor_id) {
 }
 
 void GlobalMonitor::Untag(Addr addr, size_t processor_id) {
-    if (!native)
+    if (native)
         addr = GetPageAddr(addr);
     std::scoped_lock L(mutex);
 

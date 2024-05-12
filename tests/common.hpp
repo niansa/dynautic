@@ -1,6 +1,7 @@
 #ifndef COMMON_HPP
 #define COMMON_HPP
 #include "timer.hpp"
+#include "addrs.hpp"
 
 #include <iostream>
 #include <string_view>
@@ -15,14 +16,8 @@ using u32 = std::uint32_t;
 using u64 = std::uint64_t;
 
 
-class TestBase {
+class TestBase : public Addrs {
 public:
-    constexpr static size_t mem_size = 0xf0000,
-                            heap_base = 0x10000,
-                            exe_base = 0xe0000,
-                            exit_addr = 0x40000,
-                            stack_addr = 0x60000;
-
     TestBase() {}
     virtual ~TestBase() {}
 
