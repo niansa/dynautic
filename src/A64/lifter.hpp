@@ -103,9 +103,11 @@ class Lifter {
     void FinalizeContext(Instance&);
     void CreatePCSave(Instance&);
 
+    static llvm::Value *CreateNewRegisterFromGlobal(Instance& rinst, llvm::StringRef global_name, llvm::Type *type, const llvm::Twine& name = "");
+    static void CreateStoreRegisterToGlobal(Instance& rinst, llvm::StringRef global_name, llvm::Type *type, llvm::Value *alloca);
+
     static llvm::Value *CreateLoadFromPtr(Instance& rinst, const void *, llvm::Type *type, const llvm::Twine& name = "");
     static void CreateStoreToPtr(Instance& rinst, void *, llvm::Value *value);
-
     llvm::Value *CreateMemoryLoad(Instance&, llvm::Value *address, llvm::Type *, uint8_t alignment = 0);
     void CreateMemoryStore(Instance&, llvm::Value *address, llvm::Value *data, bool volatile_ = false, uint8_t alignment = 0);
 
