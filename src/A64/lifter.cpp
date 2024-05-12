@@ -73,6 +73,7 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
         // Create entry block and branch
         Instance rinst(rt, context.get(), module.get(), function_name);
         rinst.UseBasicBlock(rinst.CreateBasicBlock("EntryBlock"));
+        LoadFunctionContext(rinst, true);
         rinst.builder->CreateBr(rinst.QueueBranch(addr, "BranchAtEntryBlock"));
 
         // Lift each leaf until none are left
@@ -82,6 +83,8 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
                 rinst.pc = rinst.GetBranchAddr();
                 CreateDebugPrintTrampoline(rinst, "Branch completed");
                 LiftLeaf(rinst, rinst.pc);
+                // Ensure branch context has been synced up properly
+                DYNAUTIC_ASSERT(!rt_values.dirty);
             } else {
                 CreateDebugPrintTrampoline(rinst, "Dynamic branch happening...");
                 CreateLiftTrampolineBlock(rinst, rinst.GetBranchOrigin());
@@ -93,6 +96,9 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
 
         // Remove function from queue
         queued_functions.pop();
+
+        // Ensure function context has been synced up properly
+        DYNAUTIC_ASSERT(!rt_allocas.dirty);
     }
 
 #ifdef ENABLE_LLVM_VALIDATION
@@ -139,7 +145,7 @@ void Lifter::LiftLeaf(Instance& rinst, VAddr addr) {
     VAddr last_addr = addr;
     std::vector<VAddr> noexec_addrs;
 
-    LoadContext(rinst);
+    LoadBranchContext(rinst);
 
     // Lift instructions in blocks
     std::array<uint8_t, 0x100> block;
