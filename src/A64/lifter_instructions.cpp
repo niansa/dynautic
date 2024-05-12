@@ -796,14 +796,14 @@ bool Lifter::InstructionLifter::Run() {
         case AArch64_INS_MRS: {
             const auto dest = GetOps(1)[0];
             const auto src = detail.operands[1];
-            DYNAUTIC_ASSERT(src.type == AArch64_OP_REG_MRS);
+            DYNAUTIC_ASSERT(src.type == AArch64_OP_SYSREG);
             Value *value = nullptr;
             switch (src.sysop.reg.sysreg) {
             case AArch64_SYSREG_CNTFRQ_EL0: value = rinst.builder->getInt32(rinst.rt.conf.cntfrq_el0); break;
             case AArch64_SYSREG_CTR_EL0: value = rinst.builder->getInt32(rinst.rt.conf.ctr_el0); break;
             case AArch64_SYSREG_DCZID_EL0: value = rinst.builder->getInt32(rinst.rt.conf.dczid_el0); break;
-            case AArch64_SYSREG_TPIDRRO_EL0: value = p.CreateMemoryLoad(rinst, rinst.builder->getInt64(reinterpret_cast<VAddr>(rinst.rt.conf.tpidrro_el0)), rinst.builder->getInt64Ty()); break;
-            case AArch64_SYSREG_TPIDR_EL0: value = p.CreateMemoryLoad(rinst, rinst.builder->getInt64(reinterpret_cast<VAddr>(rinst.rt.conf.tpidr_el0)), rinst.builder->getInt64Ty()); break;
+            case AArch64_SYSREG_TPIDRRO_EL0: value = p.CreateLoadFromPtr(rinst, reinterpret_cast<const void *>(rinst.rt.conf.tpidrro_el0), rinst.builder->getInt64Ty()); break;
+            case AArch64_SYSREG_TPIDR_EL0: value = p.CreateLoadFromPtr(rinst, reinterpret_cast<const void *>(rinst.rt.conf.tpidr_el0), rinst.builder->getInt64Ty()); break;
             default: {
                 DYNAUTIC_ASSERT(!"Unsafe MRS accessed");
                 if (rinst.rt.conf.unsafe_unexpected_situation_handling) {

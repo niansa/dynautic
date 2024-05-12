@@ -103,7 +103,7 @@ class Lifter {
     void FinalizeContext(Instance&);
     void CreatePCSave(Instance&);
 
-    static llvm::Value *CreateLoadFromPtr(Instance& rinst, void *, llvm::Type *type, const llvm::Twine& name = "");
+    static llvm::Value *CreateLoadFromPtr(Instance& rinst, const void *, llvm::Type *type, const llvm::Twine& name = "");
     static void CreateStoreToPtr(Instance& rinst, void *, llvm::Value *value);
 
     llvm::Value *CreateMemoryLoad(Instance&, llvm::Value *address, llvm::Type *, uint8_t alignment = 0);

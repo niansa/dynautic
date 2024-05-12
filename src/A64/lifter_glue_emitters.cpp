@@ -97,7 +97,7 @@ void Lifter::CreatePCSave(Instance& rinst) {
     CreateStoreToPtr(rinst, &rt.PC, rinst.builder->getInt64(rinst.pc));
 }
 
-Value *Lifter::CreateLoadFromPtr(Instance& rinst, void *ptr, Type *type, const llvm::Twine& name) {
+Value *Lifter::CreateLoadFromPtr(Instance& rinst, const void *ptr, Type *type, const llvm::Twine& name) {
     return rinst.builder->CreateLoad(type, rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<uint64_t>(ptr)), rinst.builder->getPtrTy()), name);
 }
 

@@ -183,10 +183,11 @@ void Lifter::LiftLeaf(Instance& rinst, VAddr addr) {
 
     // Lift undefined instruction if block hasn't been terminated
     if (!rinst.block_terminated) {
-        cs_insn insn;
-        insn.id = AArch64_INS_UDF;
-        insn.address = last_addr;
-        LiftInstruction(rinst, insn, noexec_addrs);
+        uint8_t udf[4] = {0xff, 0xff, 0xff, 0xff};
+        cs_insn *insns;
+        cs_disasm(cs_handle, udf, sizeof(udf), addr, 0, &insns);
+        LiftInstruction(rinst, *insns, noexec_addrs);
+        cs_free(insns, 1);
     }
 }
 
