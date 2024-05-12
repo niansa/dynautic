@@ -97,6 +97,44 @@ void Runtime::Impl::CreateJit() {
 
     jit = std::move(expected_jit.get());
     Lifter::SetupTrampolines(*jit);
+
+    CreateGlobals();
+}
+
+void Runtime::Impl::CreateGlobals() {
+    using namespace llvm;
+
+    // Create globals module
+    std::unique_ptr<LLVMContext> context = std::make_unique<LLVMContext>();
+    std::unique_ptr<Module> module = std::make_unique<Module>("Globals", *context);
+
+    // Create globals
+    auto CreateGlobal = [&] (Type *type, llvm::StringRef name) {
+        module->getOrInsertGlobal(name, type);
+        GlobalVariable *global = module->getNamedGlobal(name);
+        global->setLinkage(GlobalValue::ExternalLinkage);
+        global->setInitializer(Constant::getNullValue(type));
+        global->setConstant(false);
+    };
+    CreateGlobal(Type::getInt64Ty(*context), "stack_pointer");
+    for (unsigned idx = 0; idx != 31; idx++)
+        CreateGlobal(Type::getInt64Ty(*context), "general_register_"+std::to_string(idx));
+    for (unsigned idx = 0; idx != 32; idx++)
+        CreateGlobal(Type::getInt128Ty(*context), "vector_register_"+std::to_string(idx));
+    CreateGlobal(Type::getInt64Ty(*context), "comparison_first");
+    CreateGlobal(Type::getInt64Ty(*context), "comparison_second");
+    CreateGlobal(Type::getInt8Ty(*context), "nzcv");
+
+    // Dump generated IR if enabled
+    if (conf.dump_assembly)
+        outs() << *module;
+
+    // Add module to JIT
+    auto error = jit->addIRModule(orc::ThreadSafeModule(std::move(module), std::move(context)));
+    if (error) {
+        errs() << "Failed to add globals module: " << error << '\n';
+        jit = nullptr;
+    }
 }
 
 void Runtime::Impl::UpdateExecutionState() {
@@ -173,9 +211,9 @@ HaltReason Runtime::Run() {
     impl->executing = true;
     impl->halt_reason = HaltReason::None;
 
-    auto expected_addr = impl->raiser.Lift(impl->PC);
+    auto expected_addr = impl->raiser.Lift(impl->pc);
     if (!expected_addr) {
-        impl->conf.callbacks->ExceptionRaised(impl->PC, Exception::UnpredictableInstruction); //TODO: Raise proper exception?
+        impl->conf.callbacks->ExceptionRaised(impl->pc, Exception::UnpredictableInstruction); //TODO: Raise proper exception?
         return HaltReason::MemoryAbort;
     }
 
@@ -215,47 +253,63 @@ void Runtime::ClearHalt(HaltReason hr) {
 }
 
 std::uint64_t Runtime::GetSP() const {
-    return impl->SP;
+    if (auto expected_address = impl->jit->lookup("stack_pointer"))
+        return *reinterpret_cast<const std::uint64_t*>(expected_address->getValue());
+    return 0xbad0cac;
 }
 void Runtime::SetSP(std::uint64_t value) {
-    impl->SP = value;
+    if (auto expected_address = impl->jit->lookup("stack_pointer"))
+        *reinterpret_cast<std::uint64_t*>(expected_address->getValue()) = value;
 }
 
 std::uint64_t Runtime::GetPC() const {
-    return impl->PC;
+    return impl->pc;
 }
 void Runtime::SetPC(std::uint64_t value) {
     DYNAUTIC_ASSERT(!impl->executing);
     impl->exc.Destroy();
-    impl->PC = value;
+    impl->pc = value;
 }
 
 std::uint64_t Runtime::GetRegister(std::size_t index) const {
-    return impl->registers.at(index);
+    if (auto expected_address = impl->jit->lookup("general_register_"+std::to_string(index)))
+        return *reinterpret_cast<const std::uint64_t*>(expected_address->getValue());
+    return 0xbad0cac;
 }
 void Runtime::SetRegister(size_t index, std::uint64_t value) {
-    impl->registers.at(index) = value;
+    if (auto expected_address = impl->jit->lookup("general_register_"+std::to_string(index)))
+        *reinterpret_cast<std::uint64_t*>(expected_address->getValue()) = value;
 }
 
 std::array<std::uint64_t, 31> Runtime::GetRegisters() const {
-    return impl->registers;
+    std::array<std::uint64_t, 31> fres;
+    for (unsigned idx = 0; idx != fres.size(); ++idx)
+        fres[idx] = GetRegister(idx);
+    return fres;
 }
-void Runtime::SetRegisters(const std::array<std::uint64_t, 31>& value) {
-    impl->registers = value;
+void Runtime::SetRegisters(const std::array<std::uint64_t, 31>& values) {
+    for (unsigned idx = 0; idx != values.size(); ++idx)
+        SetRegister(idx, values[idx]);
 }
 
 Vector Runtime::GetVector(std::size_t index) const {
-    return impl->vectors.at(index);
+    if (auto expected_address = impl->jit->lookup("vector_register_"+std::to_string(index)))
+        return *reinterpret_cast<const Vector*>(expected_address->getValue());
 }
 void Runtime::SetVector(std::size_t index, Vector value) {
-    impl->vectors.at(index) = value;
+    if (auto expected_address = impl->jit->lookup("vector_register_"+std::to_string(index)))
+        *reinterpret_cast<Vector*>(expected_address->getValue()) = value;
 }
 
 std::array<Vector, 32> Runtime::GetVectors() const {
-    return impl->vectors;
+    std::array<Vector, 32> fres;
+    for (unsigned idx = 0; idx != fres.size(); ++idx)
+        fres[idx] = GetVector(idx);
+    return fres;
 }
-void Runtime::SetVectors(const std::array<Vector, 32>& value) {
-    impl->vectors = value;
+void Runtime::SetVectors(const std::array<Vector, 32>& values) {
+    for (unsigned idx = 0; idx != values.size(); ++idx)
+        SetVector(idx, values[idx]);
 }
 
 std::uint32_t Runtime::GetFpcr() const {

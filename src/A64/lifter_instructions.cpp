@@ -760,7 +760,7 @@ bool Lifter::InstructionLifter::Run() {
         } return;
         case AArch64_INS_CBNZ: extra_flags[0] = true; [[fallthrough]];
         case AArch64_INS_CBZ: {
-            p.FinalizeContext(rinst);
+            p.FinalizeBranchContext(rinst);
             const VAddr false_addr = insn.address+4;
             const auto pred = extra_flags[0]?ICmpInst::ICMP_NE:ICmpInst::ICMP_EQ;
             Value *cond = rinst.builder->CreateICmp(pred, rinst.builder->CreateIntCast(p.GetRegisterView(rinst, GetOps(1)[0]), rinst.builder->getInt64Ty(), false), rinst.builder->getInt64(0));
@@ -769,7 +769,7 @@ bool Lifter::InstructionLifter::Run() {
         case AArch64_INS_TBNZ: extra_flags[0] = true; [[fallthrough]];
         case AArch64_INS_TBZ: {
             const auto ops = GetOps(2);
-            p.FinalizeContext(rinst);
+            p.FinalizeBranchContext(rinst);
             const VAddr false_addr = insn.address+4;
             Value *value = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[0]), rinst.builder->CreateShl(ConstantInt::get(rinst.GetType(ops[0].size), 1), p.GetRegisterView(rinst, ops[1])));
             const auto pred = extra_flags[0]?ICmpInst::ICMP_NE:ICmpInst::ICMP_EQ;
