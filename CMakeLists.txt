@@ -42,7 +42,7 @@ llvm_config(dynautic USE_SHARED core executionengine orcjit nativecodegen)
 target_hardening(dynautic)
 target_compile_options(dynautic PRIVATE -Wno-error=cast-qual -Wno-error=implicit-fallthrough -Wno-string-conversion -Wno-sign-conversion)
 
-if (CMAKE_BUILD_TYPE STREQUAL Debug)
+if (CMAKE_BUILD_TYPE MATCHES "^Deb")
     target_compile_definitions(dynautic PRIVATE
         ENABLE_LLVM_VALIDATION
         ENABLE_ASSERTS
