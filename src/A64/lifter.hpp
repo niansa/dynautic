@@ -76,9 +76,9 @@ class Lifter {
         bool dirty{};
         std::array<llvm::Value *, 4> scratch_registers;
         std::array<llvm::Value *, 31> registers;
-        std::array<bool, 31> dirty_registers;
+        std::array<bool, 31> dirty_registers{};
         std::array<llvm::Value *, 32> vectors;
-        std::array<bool, 32> dirty_vectors;
+        std::array<bool, 32> dirty_vectors{};
         llvm::Value *stack_pointer;
         bool dirty_stack_pointer{};
         std::pair<llvm::Value *, llvm::Value *> comparison;
