@@ -171,7 +171,7 @@ bool GlobalMonitor::Poison(Addr addr) {
     return true;
 }
 
-bool GlobalMonitor::IsPoinsoned(Addr addr, size_t processor_id) {
+bool GlobalMonitor::IsPoisoned(Addr addr, size_t processor_id) {
     if (native)
         addr = GetPageAddr(addr);
     std::scoped_lock L(mutex);

@@ -46,7 +46,7 @@ public:
 
     void Tag(Addr addr, size_t processor_id);
     bool Poison(Addr addr);
-    bool IsPoinsoned(Addr addr, size_t processor_id);
+    bool IsPoisoned(Addr addr, size_t processor_id);
     void Untag(Addr addr, size_t processor_id);
 };
 } // namespace Dynautic

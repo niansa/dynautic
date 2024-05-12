@@ -72,7 +72,7 @@ void ExclusiveMonitorPoisonTrampoline(Runtime::Impl& rt, VAddr address) {
 }
 bool ExclusiveMonitorIsPoisonedTrampoline(Runtime::Impl& rt, VAddr address) {
     DYNAUTIC_ASSERT(rt.monitor);
-    return rt.monitor->IsPoinsoned(address, rt.conf.processor_id);
+    return rt.monitor->IsPoisoned(address, rt.conf.processor_id);
 }
 
 #ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
