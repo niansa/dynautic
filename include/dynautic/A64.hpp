@@ -300,7 +300,7 @@ public:
     /// Read all general-purpose registers.
     std::array<std::uint64_t, 31> GetRegisters() const;
     /// Modify all general-purpose registers.
-    void SetRegisters(const std::array<std::uint64_t, 31>& value);
+    void SetRegisters(const std::array<std::uint64_t, 31>& values);
 
     /// Read floating point and SIMD register.
     Vector GetVector(std::size_t index) const;
@@ -310,7 +310,7 @@ public:
     /// Read all floating point and SIMD registers.
     std::array<Vector, 32> GetVectors() const;
     /// Modify all floating point and SIMD registers.
-    void SetVectors(const std::array<Vector, 32>& value);
+    void SetVectors(const std::array<Vector, 32>& values);
 
     /// View FPCR.
     std::uint32_t GetFpcr() const;

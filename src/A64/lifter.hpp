@@ -73,11 +73,12 @@ class Lifter {
     std::queue<VAddr> queued_functions;
 
     struct RuntimeValues {
+        bool dirty{};
         std::array<llvm::Value *, 4> scratch_registers;
         std::array<llvm::Value *, 31> registers;
-        std::array<bool, 31> dirty_registers;
+        std::array<bool, 31> dirty_registers{};
         std::array<llvm::Value *, 32> vectors;
-        std::array<bool, 32> dirty_vectors;
+        std::array<bool, 32> dirty_vectors{};
         llvm::Value *stack_pointer;
         bool dirty_stack_pointer{};
         std::pair<llvm::Value *, llvm::Value *> comparison;
@@ -85,7 +86,7 @@ class Lifter {
         llvm::Value *nzcv;
         bool dirty_nzcv{};
         llvm::Value *exclusive_monitor{};
-    } rt_values;
+    } rt_values, rt_allocas;
 
     void ResetScratchRegisters();
     RegisterDescription AllocateScratchRegister(bool as_word);
@@ -99,13 +100,18 @@ class Lifter {
     llvm::Value *PerformShift(Instance&, llvm::Value *, aarch64_shifter type, uint8_t shift);
     uint64_t PerformShift(uint64_t, uint8_t bits, aarch64_shifter type, uint8_t shift);
 
-    void LoadContext(Instance&);
-    void FinalizeContext(Instance&);
+    void LoadBranchContext(Instance&);
+    void FinalizeBranchContext(Instance&);
+    void LoadFunctionContext(Instance&, bool new_allocas = false);
+    void FinalizeFunctionContext(Instance&);
     void CreatePCSave(Instance&);
+
+    static llvm::Value *CreateLoadFromGlobal(Instance& rinst, llvm::StringRef global_name, llvm::Type *type);
+    static void CreateLoadFromGlobalIntoPtr(Instance& rinst, llvm::StringRef global_name, llvm::Type *type, llvm::Value *ptr);
+    static void CreateStoreToGlobal(Instance& rinst, llvm::StringRef global_name, llvm::Value *value);
 
     static llvm::Value *CreateLoadFromPtr(Instance& rinst, const void *, llvm::Type *type, const llvm::Twine& name = "");
     static void CreateStoreToPtr(Instance& rinst, void *, llvm::Value *value);
-
     llvm::Value *CreateMemoryLoad(Instance&, llvm::Value *address, llvm::Type *, uint8_t alignment = 0);
     void CreateMemoryStore(Instance&, llvm::Value *address, llvm::Value *data, bool volatile_ = false, uint8_t alignment = 0);
 
