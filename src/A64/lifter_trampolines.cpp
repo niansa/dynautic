@@ -210,6 +210,7 @@ llvm::FunctionCallee Lifter::GetMemoryRead(Instance& rinst, uint8_t bits) {
     }
     default: DYNAUTIC_ASSERT(!"Invalid memory read width (bits != {8, 16, 32, 64, 128})");
     }
+    abort();
 }
 
 llvm::FunctionCallee Lifter::GetMemoryWrite(Instance& rinst, uint8_t bits) {
@@ -236,6 +237,7 @@ llvm::FunctionCallee Lifter::GetMemoryWrite(Instance& rinst, uint8_t bits) {
     }
     default: DYNAUTIC_ASSERT(!"Invalid memory write width (bits != {8, 16, 32, 64, 128})");
     }
+    abort();
 }
 
 llvm::FunctionCallee Lifter::GetLiftTrampoline(Instance& rinst) {
