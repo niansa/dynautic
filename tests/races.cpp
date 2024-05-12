@@ -25,6 +25,8 @@ public:
     std::unordered_map<std::thread::id, Dynautic::A64::Runtime *> cpus;
     std::mutex cpus_mutex;
 
+    std::mutex print_mutex;
+
     u64 ticks_left = 0;
     std::array<u8, Addrs::mem_size> memory{};
 
@@ -93,6 +95,7 @@ public:
         if (swi == 4) {
             GetCPU().HaltExecution(Dynautic::HaltReason::UserDefined4);
         } else if (swi == 5) {
+            std::scoped_lock L(print_mutex);
             std::cout << std::to_string(GetCPU().GetRegister(1))+' ' << std::flush;
         } else {
             GetCPU().HaltExecution(Dynautic::HaltReason::UserDefined1);
