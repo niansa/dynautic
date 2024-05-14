@@ -37,6 +37,7 @@ class Lifter::InstructionLifter {
     void SetComparison(llvm::Value *a, llvm::Value *b);
     void SetNZCV(llvm::Value *value);
     void SetNZFromInt(llvm::Value *value);
+    void SetZFromInt(llvm::Value *value);
     llvm::Value *GetN(llvm::Value *value);
     llvm::Value *GetZ(llvm::Value *value);
     llvm::Value *GetC(llvm::Value *value);

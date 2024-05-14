@@ -178,6 +178,11 @@ void Lifter::InstructionLifter::SetNZFromInt(llvm::Value *value) {
         GetZ(rinst.builder->CreateICmpEQ(value, zero)));
 }
 
+void Lifter::InstructionLifter::SetZFromInt(llvm::Value *value) {
+    llvm::Value *zero = ConstantInt::get(value->getType(), 0);
+    SetNZCV(GetZ(rinst.builder->CreateICmpEQ(value, zero)));
+}
+
 llvm::Value *Lifter::InstructionLifter::GetN(llvm::Value *value) {
     return rinst.builder->CreateSelect(value, rinst.builder->getInt8(n), rinst.builder->getInt8(0));
 }
