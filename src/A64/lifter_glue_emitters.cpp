@@ -55,7 +55,6 @@ void Lifter::LoadFunctionContext(Instance& rinst, bool new_allocas) {
     // Load branch context
     LoadBranchContext(rinst);
 }
-
 void Lifter::FinalizeFunctionContext(Instance& rinst) {
     // Finalize branch context
     if (rt_values.dirty)
@@ -120,7 +119,6 @@ void Lifter::LoadBranchContext(Instance& rinst) {
     // Fill in NZCV
     rt_values.nzcv = rinst.builder->CreateLoad(rinst.builder->getInt8Ty(), rt_allocas.nzcv, "nzcv_");
 }
-
 void Lifter::FinalizeBranchContext(Instance& rinst) {
     // Untag any tagged memory
     if (rt_values.exclusive_monitor)
@@ -176,11 +174,9 @@ void Lifter::CreatePCSave(Instance& rinst) {
 Value *Lifter::CreateLoadFromGlobal(Instance& rinst, llvm::StringRef global_name, llvm::Type *type) {
     return rinst.builder->CreateLoad(type, rinst.module->getOrInsertGlobal(global_name, type));
 }
-
 void Lifter::CreateLoadFromGlobalIntoPtr(Instance &rinst, llvm::StringRef global_name, llvm::Type *type, llvm::Value *ptr) {
     rinst.builder->CreateStore(CreateLoadFromGlobal(rinst, global_name, type), ptr);
 }
-
 void Lifter::CreateStoreToGlobal(Instance& rinst, llvm::StringRef global_name, llvm::Value *value) {
     rinst.builder->CreateStore(value, rinst.module->getNamedGlobal(global_name));
 }
@@ -188,7 +184,6 @@ void Lifter::CreateStoreToGlobal(Instance& rinst, llvm::StringRef global_name, l
 Value *Lifter::CreateLoadFromPtr(Instance& rinst, const void *ptr, Type *type, const llvm::Twine& name) {
     return rinst.builder->CreateLoad(type, rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<uint64_t>(ptr)), rinst.builder->getPtrTy()), name);
 }
-
 void Lifter::CreateStoreToPtr(Instance& rinst, void *ptr, llvm::Value *value) {
     rinst.builder->CreateStore(value, rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<uint64_t>(ptr)), rinst.builder->getPtrTy()));
 }
@@ -203,7 +198,6 @@ Value *Lifter::CreateMemoryLoad(Instance& rinst, llvm::Value *address, Type *typ
         rinst.builder->CreateCall(GetUpdateExecutionStateTrampoline(rinst), {runtime});
     return fres;
 }
-
 void Lifter::CreateMemoryStore(Instance& rinst, llvm::Value *address, llvm::Value *data, bool volatile_, uint8_t alignment) {
     if (rt.conf.native_memory) {
         rinst.builder->CreateAlignedStore(data, rinst.builder->CreateIntToPtr(address, rinst.builder->getPtrTy()), MaybeAlign(alignment), volatile_);
