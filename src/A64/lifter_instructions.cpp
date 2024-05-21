@@ -406,6 +406,7 @@ bool Lifter::InstructionLifter::Run() {
             const auto ops = GetOps(2);
             Type *type = rinst.GetType(ops[1].size);
             Value *value = p.GetRegisterView(rinst, ops[1]);
+            // Could use llvm.abs.*(*, false) instead
             p.StoreRegister(rinst, ops[0], rinst.builder->CreateAdd(rinst.builder->CreateNot(value), ConstantInt::get(type, 1)));
         } return;
         case AArch64_INS_CSEL: {
