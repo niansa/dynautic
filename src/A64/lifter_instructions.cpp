@@ -259,6 +259,7 @@ bool Lifter::InstructionLifter::Run() {
     const bool conditional = detail.cc != AArch64CC_Invalid
                              && insn.id != AArch64_INS_CSEL
                              && insn.alias_id != AArch64_INS_ALIAS_CSET
+                             && insn.id != AArch64_INS_CCMN
                              && insn.id != AArch64_INS_CCMP;
     if (conditional) {
         Value *condition = GetCondition();
@@ -472,9 +473,13 @@ bool Lifter::InstructionLifter::Run() {
             const auto ops = GetOps(2);
             p.StoreRegister(rinst, ops[0], rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[1]), rinst.builder->getInt64Ty(), true));
         } return;
+        case AArch64_INS_ALIAS_CMN: extra_flags[0] = true; [[fallthrough]];
         case AArch64_INS_ALIAS_CMP: {
             const auto ops = GetOps(2);
-            SetComparison(p.GetRegisterView(rinst, ops[0]), p.GetRegisterView(rinst, ops[1]));
+            Value *right_value = p.GetRegisterView(rinst, ops[1]);
+            if (extra_flags[0])
+                right_value = rinst.builder->CreateNot(right_value);
+            SetComparison(p.GetRegisterView(rinst, ops[0]), right_value);
         } return;
         case AArch64_INS_ADR: {
             const auto ops = GetOps(2);
@@ -802,11 +807,16 @@ bool Lifter::InstructionLifter::Run() {
             p.CreateCall(rinst, insn.address, p.GetRegisterView(rinst, "x30"));
         } return;
         // Conditional instruction
+        case AArch64_INS_CCMN: extra_flags[0] = true; [[fallthrough]];
         case AArch64_INS_CCMP: {
             const auto ops = GetOps(3);
             Value *imm = rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[2]), rinst.builder->getInt8Ty(), false);
-            SetComparison(p.GetRegisterView(rinst, ops[0]), p.GetRegisterView(rinst, ops[1]));
-            SetNZCVIf(imm, GetComparisonCondition());
+            Value *right_value = p.GetRegisterView(rinst, ops[1]);
+            Value *condition = GetComparisonCondition();
+            if (extra_flags[0])
+                right_value = rinst.builder->CreateNot(right_value);
+            SetComparison(p.GetRegisterView(rinst, ops[0]), right_value);
+            SetNZCVIf(imm, rinst.builder->CreateNot(condition));
         } return;
         case AArch64_INS_ALIAS_CSET: {
             p.StoreRegister(rinst, GetOps(1)[0], GetCondition());
