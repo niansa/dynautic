@@ -485,28 +485,21 @@ bool Lifter::InstructionLifter::Run() {
             p.StoreRegister(rinst, ops[0], value);
             #else
             // Check if right side is zero
-            llvm::Value *is_valid = rinst.builder->CreateICmpNE(p.GetRegisterView(rinst, ops[2]), ConstantInt::get(type, 0), "IsValidDiv");
-            // Brach depending on result
-            BasicBlock *valid_branch = rinst.CreateBasicBlock("DivisionValidBranch");
-            BasicBlock *invalid_branch = rinst.CreateBasicBlock("DivisionInValidBranch");
-            BasicBlock *continue_branch = rinst.CreateBasicBlock("DivisionContinue");
-            //TODO: Mark invalid branch as unlikely
-            rinst.builder->CreateCondBr(is_valid, valid_branch, invalid_branch);
-            // Write out valid branch
-            rinst.UseBasicBlock(valid_branch);
+            Value *is_valid = rinst.builder->CreateICmpNE(p.GetRegisterView(rinst, ops[2]), ConstantInt::get(type, 0), "IsValidDiv");
+            // Get operands
+            Value *left_value = p.GetRegisterView(rinst, ops[1]),
+                  *right_value = p.GetRegisterView(rinst, ops[2]);
+            // Generate zero as result if right value is zero
+            left_value = rinst.builder->CreateSelect(is_valid, left_value, ConstantInt::get(type, 0));
+            right_value = rinst.builder->CreateSelect(is_valid, right_value, ConstantInt::get(type, 1));
+            // Do division
             Value *value;
             switch (id) {
-            case AArch64_INS_SDIV: value = rinst.builder->CreateSDiv(p.GetRegisterView(rinst, ops[1]), p.GetRegisterView(rinst, ops[2])); break;
-            case AArch64_INS_UDIV: value = rinst.builder->CreateUDiv(p.GetRegisterView(rinst, ops[1]), p.GetRegisterView(rinst, ops[2])); break;
+            case AArch64_INS_SDIV: value = rinst.builder->CreateSDiv(left_value, right_value); break;
+            case AArch64_INS_UDIV: value = rinst.builder->CreateUDiv(left_value, right_value); break;
             }
+            // Store final result
             p.StoreRegister(rinst, ops[0], value);
-            rinst.builder->CreateBr(continue_branch);
-            // Write out invalid branch
-            rinst.UseBasicBlock(invalid_branch);
-            p.StoreRegister(rinst, ops[0], ConstantInt::get(type, 0));
-            rinst.builder->CreateBr(continue_branch);
-            // Begin continue branch
-            rinst.UseBasicBlock(continue_branch);
             #endif
         } return;
         case AArch64_INS_ALIAS_SXTB:
