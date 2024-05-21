@@ -185,6 +185,12 @@ uint8_t Lifter::InstructionLifter::GetLoadStoreFlagsAndSize(uint64_t insn_id) {
     case AArch64_INS_STRB:
     case AArch64_INS_ALIAS_LDRB:
     case AArch64_INS_LDRB: extra_flags[byte] = true; break;
+    case AArch64_INS_ALIAS_LDRSB:
+    case AArch64_INS_LDRSB: extra_flags[signed_] = extra_flags[byte] = true; break;
+    case AArch64_INS_ALIAS_LDRH:
+    case AArch64_INS_LDRH: extra_flags[half_word] = true; break;
+    case AArch64_INS_ALIAS_LDRSH:
+    case AArch64_INS_LDRSH: extra_flags[signed_] = extra_flags[half_word] = true; break;
     case AArch64_INS_ALIAS_LDRSW:
     case AArch64_INS_LDRSW: extra_flags[signed_] = extra_flags[word] = true; break;
     case AArch64_INS_STXR:
@@ -196,6 +202,8 @@ uint8_t Lifter::InstructionLifter::GetLoadStoreFlagsAndSize(uint64_t insn_id) {
     case AArch64_INS_STLXR: extra_flags[exclusive] = extra_flags[release] = true; break;
     case AArch64_INS_STLXRB: extra_flags[byte] = extra_flags[exclusive] = extra_flags[release] = true; break;
     case AArch64_INS_STLXRH: extra_flags[half_word] = extra_flags[exclusive] = extra_flags[release] = true; break;
+    case AArch64_INS_ALIAS_STRH:
+    case AArch64_INS_STRH: extra_flags[half_word] = true; break;
     case AArch64_INS_ALIAS_STR:
     case AArch64_INS_STR:
     case AArch64_INS_ALIAS_LDR:
@@ -462,16 +470,64 @@ bool Lifter::InstructionLifter::Run() {
             result = rinst.builder->CreateLShr(result, 64);
             p.StoreRegister(rinst, ops[0], rinst.builder->CreateIntCast(result, rinst.builder->getInt64Ty(), false));
         } return;
+        case AArch64_INS_SDIV:
         case AArch64_INS_UDIV: {
-            Handle3Ops(rinst.builder->CreateUDiv);
+            const auto ops = GetOps(3);
+            Type *type = rinst.GetType(ops[0].size);
+            #ifdef __aarch64__
+            // Handle division on arm64 natively
+            Intrinsic::ID intr;
+            switch (id) {
+            case AArch64_INS_SDIV: intr = Intrinsic::aarch64_sdiv; break;
+            case AArch64_INS_UDIV: intr = Intrinsic::aarch64_udiv; break;
+            }
+            Value *value = rinst.builder->CreateIntrinsic(type, intr, {p.GetRegisterView(rinst, ops[1]), p.GetRegisterView(rinst, ops[2])});
+            p.StoreRegister(rinst, ops[0], value);
+            #else
+            // Check if right side is zero
+            llvm::Value *is_valid = rinst.builder->CreateICmpNE(p.GetRegisterView(rinst, ops[2]), ConstantInt::get(type, 0), "IsValidDiv");
+            // Brach depending on result
+            BasicBlock *valid_branch = rinst.CreateBasicBlock("DivisionValidBranch");
+            BasicBlock *invalid_branch = rinst.CreateBasicBlock("DivisionInValidBranch");
+            BasicBlock *continue_branch = rinst.CreateBasicBlock("DivisionContinue");
+            //TODO: Mark invalid branch as unlikely
+            rinst.builder->CreateCondBr(is_valid, valid_branch, invalid_branch);
+            // Write out valid branch
+            rinst.UseBasicBlock(valid_branch);
+            Value *value;
+            switch (id) {
+            case AArch64_INS_SDIV: value = rinst.builder->CreateSDiv(p.GetRegisterView(rinst, ops[1]), p.GetRegisterView(rinst, ops[2])); break;
+            case AArch64_INS_UDIV: value = rinst.builder->CreateUDiv(p.GetRegisterView(rinst, ops[1]), p.GetRegisterView(rinst, ops[2])); break;
+            }
+            p.StoreRegister(rinst, ops[0], value);
+            rinst.builder->CreateBr(continue_branch);
+            // Write out invalid branch
+            rinst.UseBasicBlock(invalid_branch);
+            p.StoreRegister(rinst, ops[0], ConstantInt::get(type, 0));
+            rinst.builder->CreateBr(continue_branch);
+            // Begin continue branch
+            rinst.UseBasicBlock(continue_branch);
+            #endif
         } return;
-        case AArch64_INS_SDIV: {
-            Handle3Ops(rinst.builder->CreateSDiv);
-        } return;
+        case AArch64_INS_ALIAS_SXTB:
+        case AArch64_INS_SXTB: extra_flags[byte] = true; [[fallthrough]];
+        case AArch64_INS_ALIAS_SXTH:
+        case AArch64_INS_SXTH: extra_flags[half_word] = true; [[fallthrough]];
         case AArch64_INS_ALIAS_SXTW:
-        case AArch64_INS_SXTW: {
+        case AArch64_INS_SXTW: extra_flags[word] = true; {
             const auto ops = GetOps(2);
-            p.StoreRegister(rinst, ops[0], rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[1]), rinst.builder->getInt64Ty(), true));
+            Value *right_value = p.GetRegisterView(rinst, ops[1]);
+            Type *source = nullptr;
+            if (extra_flags[byte])
+                source = rinst.builder->getInt8Ty();
+            else if (extra_flags[half_word])
+                source = rinst.builder->getInt16Ty();
+            else if (extra_flags[word])
+                source = rinst.builder->getInt32Ty();
+            else
+                DYNAUTIC_ASSERT(!"Invalid source width in sign extend");
+            right_value = rinst.builder->CreateIntCast(right_value, source, false);
+            p.StoreRegister(rinst, ops[0], rinst.builder->CreateIntCast(right_value, rinst.builder->getInt64Ty(), true));
         } return;
         case AArch64_INS_ALIAS_CMN: extra_flags[0] = true; [[fallthrough]];
         case AArch64_INS_ALIAS_CMP: {
@@ -504,6 +560,12 @@ bool Lifter::InstructionLifter::Run() {
         case AArch64_INS_LDUR:
         case AArch64_INS_ALIAS_LDRB:
         case AArch64_INS_LDRB:
+        case AArch64_INS_ALIAS_LDRSB:
+        case AArch64_INS_LDRSB:
+        case AArch64_INS_ALIAS_LDRH:
+        case AArch64_INS_LDRH:
+        case AArch64_INS_ALIAS_LDRSH:
+        case AArch64_INS_LDRSH:
         case AArch64_INS_ALIAS_LDRSW:
         case AArch64_INS_LDRSW:
         case AArch64_INS_ALIAS_LDR:
@@ -546,6 +608,8 @@ bool Lifter::InstructionLifter::Run() {
         case AArch64_INS_STUR:
         case AArch64_INS_ALIAS_STRB:
         case AArch64_INS_STRB:
+        case AArch64_INS_ALIAS_STRH:
+        case AArch64_INS_STRH:
         case AArch64_INS_ALIAS_STR:
         case AArch64_INS_STR: {
             const uint8_t msiz = GetLoadStoreFlagsAndSize(id);
