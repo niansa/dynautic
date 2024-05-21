@@ -490,8 +490,10 @@ bool Lifter::InstructionLifter::Run() {
             Value *left_value = p.GetRegisterView(rinst, ops[1]),
                   *right_value = p.GetRegisterView(rinst, ops[2]);
             // Generate zero as result if right value is zero
-            left_value = rinst.builder->CreateSelect(is_valid, left_value, ConstantInt::get(type, 0));
-            right_value = rinst.builder->CreateSelect(is_valid, right_value, ConstantInt::get(type, 1));
+            if (!p.rt.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreDivByZero)) {
+                left_value = rinst.builder->CreateSelect(is_valid, left_value, ConstantInt::get(type, 0));
+                right_value = rinst.builder->CreateSelect(is_valid, right_value, ConstantInt::get(type, 1));
+            }
             // Do division
             Value *value;
             switch (id) {

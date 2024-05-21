@@ -39,6 +39,9 @@ enum class OptimizationFlag : std::uint32_t {
     /// This is an UNSAFE optimization that makes CMP results local to block scope. This slightly reduces
     /// branching overhead after CMP instructions. This may result in unexpected behavior in certain situations.
     Unsafe_ScopedCMP = 0x00400000,
+    /// This is an UNSAFE optimization that removes checks for division by zero. This will crash on host
+    /// architectures that create an exception when dividing by zero.
+    Unsafe_IgnoreDivByZero = 0x00800000,
 };
 
 constexpr OptimizationFlag no_optimizations = static_cast<OptimizationFlag>(0);
