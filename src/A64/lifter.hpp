@@ -104,6 +104,7 @@ class Lifter {
     void FinalizeBranchContext(Instance&);
     void LoadFunctionContext(Instance&, bool new_allocas = false);
     void FinalizeFunctionContext(Instance&);
+    void UndirtyFunctionContext();
     void CreatePCSave(Instance&);
 
     static llvm::Value *CreateLoadFromGlobal(Instance& rinst, llvm::StringRef global_name, llvm::Type *type);

@@ -73,6 +73,7 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
         // Create entry block and branch
         Instance rinst(rt, context.get(), module.get(), function_name);
         rinst.UseBasicBlock(rinst.CreateBasicBlock("EntryBlock"));
+        UndirtyFunctionContext();
         LoadFunctionContext(rinst, true);
         rinst.builder->CreateBr(rinst.QueueBranch(addr, "BranchAtEntryBlock"));
 

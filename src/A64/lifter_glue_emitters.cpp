@@ -61,40 +61,40 @@ void Lifter::FinalizeFunctionContext(Instance& rinst) {
         FinalizeBranchContext(rinst);
 
     // Write out stack pointer
-    if (rt_allocas.dirty_stack_pointer) {
+    if (rt_allocas.dirty_stack_pointer)
         CreateStoreToGlobal(rinst, "stack_pointer", rinst.builder->CreateLoad(rinst.builder->getInt64Ty(), rt_allocas.stack_pointer));
-        rt_allocas.dirty_stack_pointer = false;
-    }
 
     // Write out general purpose registers
     for (unsigned idx = 0; idx !=rt_allocas. registers.size(); ++idx) {
-        if (rt_allocas.dirty_registers[idx]) {
+        if (rt_allocas.dirty_registers[idx])
             CreateStoreToGlobal(rinst, "general_register_"+std::to_string(idx), rinst.builder->CreateLoad(rinst.builder->getInt64Ty(), rt_allocas.registers[idx]));
-            rt_allocas.dirty_registers[idx] = false;
-        }
     }
 
     // Write out vector registers
     for (unsigned idx = 0; idx != rt_allocas.vectors.size(); ++idx) {
-        if (rt_allocas.dirty_vectors[idx]) {
+        if (rt_allocas.dirty_vectors[idx])
             CreateStoreToGlobal(rinst, "vector_register_"+std::to_string(idx), rinst.builder->CreateLoad(rinst.builder->getInt128Ty(), rt_allocas.vectors[idx]));
-            rt_allocas.dirty_vectors[idx] = false;
-        }
     }
 
     // Write out comparisation
     if (rt_allocas.dirty_comparison) {
         CreateStoreToGlobal(rinst, "comparison_first", rinst.builder->CreateLoad(rinst.builder->getInt64Ty(), rt_allocas.comparison.first));
         CreateStoreToGlobal(rinst, "comparison_first", rinst.builder->CreateLoad(rinst.builder->getInt64Ty(), rt_allocas.comparison.second));
-        rt_allocas.dirty_comparison = false;
     }
 
     // Write out NZCV
-    if (rt_allocas.dirty_nzcv) {
+    if (rt_allocas.dirty_nzcv)
         CreateStoreToGlobal(rinst, "nzcv", rinst.builder->CreateLoad(rinst.builder->getInt8Ty(), rt_allocas.nzcv));
-        rt_allocas.dirty_nzcv = false;
-    }
 
+    rt_allocas.dirty = false;
+}
+
+void Lifter::UndirtyFunctionContext() {
+    rt_allocas.dirty_stack_pointer = false;
+    rt_allocas.dirty_registers.fill(false);
+    rt_allocas.dirty_vectors.fill(false);
+    rt_allocas.dirty_comparison = false;
+    rt_allocas.dirty_nzcv = false;
     rt_allocas.dirty = false;
 }
 
