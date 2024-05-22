@@ -82,34 +82,64 @@ void DebugPrintTrampoline(const char *message, VAddr addr) {
 #endif
 
 uint8_t MemoryRead8(Runtime::Impl& rt, VAddr addr) {
+#ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
+    std::cout << "Runtime debug message: 8 bits of data read from 0x" << std::hex << addr << std::dec << std::endl;
+#endif
     return rt.conf.callbacks->MemoryRead8(addr);
 }
 uint16_t MemoryRead16(Runtime::Impl& rt, VAddr addr) {
+#ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
+    std::cout << "Runtime debug message: 16 bits of data read from 0x" << std::hex << addr << std::dec << std::endl;
+#endif
     return rt.conf.callbacks->MemoryRead16(addr);
 }
 uint32_t MemoryRead32(Runtime::Impl& rt, VAddr addr) {
+#ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
+    std::cout << "Runtime debug message: 32 bits of data read from 0x" << std::hex << addr << std::dec << std::endl;
+#endif
     return rt.conf.callbacks->MemoryRead32(addr);
 }
 uint64_t MemoryRead64(Runtime::Impl& rt, VAddr addr) {
+#ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
+    std::cout << "Runtime debug message: 64 bits of data read from 0x" << std::hex << addr << std::dec << std::endl;
+#endif
     return rt.conf.callbacks->MemoryRead64(addr);
 }
 Vector MemoryRead128(Runtime::Impl& rt, VAddr addr) {
+#ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
+    std::cout << "Runtime debug message: 128 bits of data read from 0x" << std::hex << addr << std::dec << std::endl;
+#endif
     return rt.conf.callbacks->MemoryRead128(addr);
 }
 
 void MemoryWrite8(Runtime::Impl& rt, VAddr addr, uint8_t value) {
+#ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
+    std::cout << "Runtime debug message: 8 bits of data written to 0x" << std::hex << addr << std::dec << std::endl;
+#endif
     rt.conf.callbacks->MemoryWrite8(addr, value);
 }
 void MemoryWrite16(Runtime::Impl& rt, VAddr addr, uint16_t value) {
+#ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
+    std::cout << "Runtime debug message: 16 bits of data written to 0x" << std::hex << addr << std::dec << std::endl;
+#endif
     rt.conf.callbacks->MemoryWrite16(addr, value);
 }
 void MemoryWrite32(Runtime::Impl& rt, VAddr addr, uint32_t value) {
+#ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
+    std::cout << "Runtime debug message: 32 bits of data written to 0x" << std::hex << addr << std::dec << std::endl;
+#endif
     rt.conf.callbacks->MemoryWrite32(addr, value);
 }
 void MemoryWrite64(Runtime::Impl& rt, VAddr addr, uint64_t value) {
+#ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
+    std::cout << "Runtime debug message: 64 bits of data written to 0x" << std::hex << addr << std::dec << std::endl;
+#endif
     rt.conf.callbacks->MemoryWrite64(addr, value);
 }
 void MemoryWrite128(Runtime::Impl& rt, VAddr addr, Vector value) {
+#ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
+    std::cout << "Runtime debug message: 128 bits of data written to 0x" << std::hex << addr << std::dec << std::endl;
+#endif
     rt.conf.callbacks->MemoryWrite128(addr, value);
 }
 }
