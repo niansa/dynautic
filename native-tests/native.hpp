@@ -13,7 +13,7 @@ public:
         common::Timer timer;
         u64 fres = fnc();
         const auto duration = timer.get();
-        std::cout << "Native done after " << duration << "ms!" << std::endl;
+        std::cout << "Native done after " << std::dec << duration << "ms!" << std::endl;
         return fres;
     }
 };
