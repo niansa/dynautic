@@ -231,12 +231,12 @@ void Lifter::InstructionLifter::DeferCompilation(bool repeat_instruction) {
     } while (0)
 #define Handle3Ops(func) \
     do { \
-        auto ops = GetOps(3); \
+        const auto ops = GetOps(3); \
         p.StoreRegister(rinst, ops[0], func(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift), rinst.GetType(ops[1].size), false))); \
     } while (0)
 #define Handle3OpsNot(func) \
     do { \
-        auto ops = GetOps(3); \
+        const auto ops = GetOps(3); \
         p.StoreRegister(rinst, ops[0], func(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateNot(rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift), rinst.GetType(ops[1].size), false)))); \
     } while (0)
 
@@ -353,13 +353,13 @@ bool Lifter::InstructionLifter::Run() {
         } return;
         case AArch64_INS_ALIAS_ANDS:
         case AArch64_INS_ANDS: {
-            auto ops = GetOps(3);
+            const auto ops = GetOps(3);
             Value *result = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift), rinst.GetType(ops[1].size), false));
             p.StoreRegister(rinst, ops[0], result);
             SetNZFromInt(result);
         } return;
         case AArch64_INS_ALIAS_TST: {
-            auto ops = GetOps(2);
+            const auto ops = GetOps(2);
             Value *result = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[0]), rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[1]), shift_type, shift), rinst.GetType(ops[0].size), false));
             SetNZFromInt(result);
         } return;
@@ -369,7 +369,7 @@ bool Lifter::InstructionLifter::Run() {
         } return;
         case AArch64_INS_ALIAS_BICS:
         case AArch64_INS_BICS: {
-            auto ops = GetOps(3);
+            const auto ops = GetOps(3);
             Value *result = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateNot(rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift), rinst.GetType(ops[1].size), false)));
             p.StoreRegister(rinst, ops[0], result);
             SetNZFromInt(result);
@@ -443,12 +443,12 @@ bool Lifter::InstructionLifter::Run() {
             Handle3Ops(rinst.builder->CreateSub);
         } return;
         case AArch64_INS_MSUB: {
-            auto ops = GetOps(4);
+            const auto ops = GetOps(4);
             Value *mul = rinst.builder->CreateMul(p.GetRegisterView(rinst, ops[1]), p.GetRegisterView(rinst, ops[2]));
             p.StoreRegister(rinst, ops[0], rinst.builder->CreateSub(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[3]), shift_type, shift), mul));
         } return;
         case AArch64_INS_MADD: {
-            auto ops = GetOps(4);
+            const auto ops = GetOps(4);
             Value *mul = rinst.builder->CreateMul(p.GetRegisterView(rinst, ops[1]), p.GetRegisterView(rinst, ops[2]));
             p.StoreRegister(rinst, ops[0], rinst.builder->CreateAdd(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[3]), shift_type, shift), mul));
         } return;
@@ -457,7 +457,14 @@ bool Lifter::InstructionLifter::Run() {
             Handle2Ops(rinst.builder->CreateNeg);
         } return;
         case AArch64_INS_ALIAS_UMULL:
-        case AArch64_INS_UMULL:
+        case AArch64_INS_UMULL: {
+            auto ops = GetOps(3);
+            Type *type = rinst.builder->getInt64Ty();
+            Value *value = rinst.builder->CreateMul(
+                rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[1]), type, false),
+                rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[2]), type, false));
+            p.StoreRegister(rinst, ops[0], value);
+        } break;
         case AArch64_INS_ALIAS_MUL:
         case AArch64_INS_MUL: {
             Handle3Ops(rinst.builder->CreateMul);
