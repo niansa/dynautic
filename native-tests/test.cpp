@@ -14,13 +14,27 @@ uint64_t simple_function_call() noexcept {
     return simple_val_return();
 }
 
-void simple_recursion_func(unsigned *x) {
+void simple_recursion_func(unsigned *x) noexcept {
     if ((*x)++ < 100)
         simple_recursion_func(x);
 }
 uint64_t simple_recursion() {
     unsigned fres = 63;
     simple_recursion_func(&fres);
+    return fres;
+}
+
+unsigned long is_prime_cpu(unsigned long num) noexcept {
+     if (num % 2 == 0 && num > 2) return 0;
+     for(int i = 3; i < num / 2; i+= 2)
+         if (num % i == 0)
+             return 0;
+     return 1;
+}
+uint64_t primes() noexcept {
+    unsigned long fres = 0;
+    for (unsigned long it = 2; it != 1000000; ++it)
+        fres += is_prime_cpu(it);
     return fres;
 }
 
@@ -74,4 +88,5 @@ int main() {
     dynautic->RunTest("Simple function call", &simple_function_call, native.get());
     dynautic->RunTest("Simple recursive function call", &simple_recursion, native.get());
     dynautic->RunTest("Brainfuck", &brainfuck, native.get());
+    dynautic->RunTest("Primes", &primes, native.get());
 }
