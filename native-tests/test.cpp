@@ -59,7 +59,7 @@ void brainfuck_interpret(const char *code, unsigned long *result) noexcept {
     }
 }
 uint64_t brainfuck() noexcept {
-    const char code[] = "++++++++++[>+>+++>+++++++>++++++++++<<<<-]>>>++.>+.+++++++..+++.<<++.>+++++++++++++++.>.+++.------.--------.<<+.<.";
+    const char code[] = "[ This program prints Sierpinski triangle on 80-column display. ] > + + + + [ < + + + + + + + + > - ] > + + + + + + + + [ > + + + + < - ] > > + + > > > + > > > + < < < < < < < < < < [ - [ - > + < ] > [ - < + > > > . < < ] > > > [ [ - > + + + + + + + + [ > + + + + < - ] > . < < [ - > + < ] + > [ - > + + + + + + + + + + < < + > ] > . [ - ] > ] ] + < < < [ - [ - > + < ] + > [ - < + > > > - [ - > + < ] + + > [ - < - > ] < < < ] < < < < ] + + + + + + + + + + . + + + . [ - ] < ] + + + + + * * * * * M a d e * B y : * N Y Y R I K K I * 2 0 0 2 * * * * *";
     unsigned long fres = 0;
     brainfuck_interpret(code, &fres);
     return fres;
