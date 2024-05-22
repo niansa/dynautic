@@ -673,15 +673,19 @@ bool Lifter::InstructionLifter::Run() {
             reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
             p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[1]));
         } return;
-        case AArch64_INS_ALIAS_SBFX: {
+        case AArch64_INS_ALIAS_SBFX: extra_flags[signed_] = true; [[fallthrough]];
+        case AArch64_INS_ALIAS_UBFX: {
             const auto ops = GetOps(2);
             // Calculate bits
-            const auto total_bits = ops[0].size;
-            const auto ashr_bits = total_bits - detail.operands[3].imm;
-            const auto shl_bits = ashr_bits - detail.operands[2].imm;
-            // Generate instruction sequence leading to SBFX on arm64
+            const uint64_t total_bits = ops[0].size;
+            const auto shr_bits = total_bits - detail.operands[3].imm;
+            const auto shl_bits = shr_bits - detail.operands[2].imm;
+            // Generate instruction sequence leading to SBFX/UBFX on arm64
             Value *value = rinst.builder->CreateShl(p.GetRegisterView(rinst, ops[1]), shl_bits);
-            value = rinst.builder->CreateAShr(value, ashr_bits);
+            if (extra_flags[signed_])
+                value = rinst.builder->CreateAShr(value, shr_bits);
+            else
+                value = rinst.builder->CreateLShr(value, shr_bits);
             // Store result to output register
             p.StoreRegister(rinst, ops[0], value);
         } return;
