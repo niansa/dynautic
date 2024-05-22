@@ -665,6 +665,18 @@ bool Lifter::InstructionLifter::Run() {
             reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
             p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[1]));
         } return;
+        case AArch64_INS_ALIAS_SBFX: {
+            const auto ops = GetOps(2);
+            // Calculate bits
+            const auto total_bits = ops[0].size;
+            const auto ashr_bits = total_bits - detail.operands[3].imm;
+            const auto shl_bits = ashr_bits - detail.operands[2].imm;
+            // Generate instruction sequence leading to SBFX on arm64
+            Value *value = rinst.builder->CreateShl(p.GetRegisterView(rinst, ops[1]), shl_bits);
+            value = rinst.builder->CreateAShr(value, ashr_bits);
+            // Store result to output register
+            p.StoreRegister(rinst, ops[0], value);
+        } return;
         // Atomic store instructions
         case AArch64_INS_CAS:
         case AArch64_INS_CASA:
@@ -893,7 +905,7 @@ bool Lifter::InstructionLifter::Run() {
             case AArch64_SYSREG_TPIDRRO_EL0: value = p.CreateLoadFromPtr(rinst, reinterpret_cast<const void *>(rinst.rt.conf.tpidrro_el0), rinst.builder->getInt64Ty()); break;
             case AArch64_SYSREG_TPIDR_EL0: value = p.CreateLoadFromPtr(rinst, reinterpret_cast<const void *>(rinst.rt.conf.tpidr_el0), rinst.builder->getInt64Ty()); break;
             default: {
-                DYNAUTIC_ASSERT(!"Unsafe MRS accessed");
+                DYNAUTIC_ASSERT(!"Unknown MRS access");
                 if (rinst.rt.conf.unsafe_unexpected_situation_handling) {
                     value = rinst.builder->getInt64(0);
                 } else {
