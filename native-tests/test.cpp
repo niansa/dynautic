@@ -50,8 +50,8 @@ void brainfuck_procchar(char c, unsigned long *result) noexcept {
     *result += c;
 }
 void brainfuck_interpret(const char *code, unsigned long *result) noexcept {
-    static byte memory[10240];
-    brainfuck_zmem(memory, 10240);
+    static byte memory[1024];
+    brainfuck_zmem(memory, sizeof(memory));
     byte *ptr = memory;
     static const char *stack[1024];
     const char **stack_ptr = stack;
