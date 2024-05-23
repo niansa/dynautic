@@ -112,6 +112,16 @@ int main(int argc, char** argv) {
                       0xd65f03c0  // ret
                   }, reference);
 
+    dynautic->RunTest("Simple 64bit ubfiz", {
+                      0xd37a2400, // ubfiz x0, x0, #6, #10
+                      0xd65f03c0  // ret
+                  }, reference);
+
+    dynautic->RunTest("Simple 64bit sbfiz", {
+                      0x937a2400, // sbfiz x0, x0, #6, #10
+                      0xd65f03c0  // ret
+                  }, reference);
+
     dynautic->RunTest("Mixture of shift instructions", {
                       0xd2800084, // mov x4, #4
                       0x9ac42400, // lsr x0, x0, x4
