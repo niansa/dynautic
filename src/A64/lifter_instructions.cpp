@@ -953,9 +953,25 @@ bool Lifter::InstructionLifter::Run() {
             const uint32_t swi = static_cast<uint32_t>(detail.operands[0].imm);
             p.CreateSvcTrampoline(rinst, swi);
         } return;
+        case AArch64_INS_ALIAS_WFI: {
+            if (rinst.rt.conf.hook_hint_instructions)
+                p.CreateExceptionTrampoline(rinst, Exception::WaitForInterrupt);
+        } return;
+        case AArch64_INS_ALIAS_WFE: {
+            if (rinst.rt.conf.hook_hint_instructions)
+                p.CreateExceptionTrampoline(rinst, Exception::WaitForEvent);
+        } return;
+        case AArch64_INS_ALIAS_SEV: {
+            if (rinst.rt.conf.hook_hint_instructions)
+                p.CreateExceptionTrampoline(rinst, Exception::SendEvent);
+        } return;
+        case AArch64_INS_ALIAS_SEVL: {
+            if (rinst.rt.conf.hook_hint_instructions)
+                p.CreateExceptionTrampoline(rinst, Exception::SendEventLocal);
+        } return;
         case AArch64_INS_BRK: {
-            //if (rinst.rt.conf.hook_hint_instructions)  TODO: Should this check happen here?
-            p.CreateExceptionTrampoline(rinst, Exception::Breakpoint);
+            if (rinst.rt.conf.hook_hint_instructions)
+                p.CreateExceptionTrampoline(rinst, Exception::Breakpoint);
         } return;
         case AArch64_INS_ALIAS_YIELD: {
             if (rinst.rt.conf.hook_hint_instructions)
