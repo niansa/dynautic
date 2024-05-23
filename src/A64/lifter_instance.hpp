@@ -82,7 +82,7 @@ public:
         return &branch->addr;
     }
 
-    llvm::Type *GetType(uint8_t bits);
+    llvm::Type *GetType(uint8_t bits, bool allow_vector = false);
 };
 }
 

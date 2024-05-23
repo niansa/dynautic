@@ -123,7 +123,7 @@ Value *&Lifter::GetRawRegister(RegisterDescription desc, bool allow_store_to) {
     }
 }
 
-Value *Lifter::GetRegisterView(Instance& rinst, RegisterDescription desc) {
+Value *Lifter::GetRegisterView(Instance& rinst, RegisterDescription desc, bool allow_vector) {
     if (desc.type == RegisterDescription::Type::invalid) {
         DYNAUTIC_ASSERT(!"Invalid register type");
         if (rt.conf.unsafe_unexpected_situation_handling)
@@ -137,10 +137,17 @@ Value *Lifter::GetRegisterView(Instance& rinst, RegisterDescription desc) {
         return ConstantInt::get(rinst.GetType(desc.size), 0);
     // Get real register from list
     Value *fres = GetRawRegister(desc, false);
+    // Convert from vector to integer as needed
+    Type *type = fres->getType();
+    if (type->isVectorTy() && (!allow_vector || type->getPrimitiveSizeInBits() != desc.size)) {
+        DYNAUTIC_ASSERT(type->getPrimitiveSizeInBits() >= desc.size);
+        type = rinst.GetType(static_cast<uint8_t>(type->getPrimitiveSizeInBits()), allow_vector);
+        fres = rinst.builder->CreateBitCast(fres, type);
+    }
     // Truncate as needed
-    fres = rinst.builder->CreateTrunc(fres, rinst.GetType(desc.size));
+    if (!type->isVectorTy())
+        fres = rinst.builder->CreateTrunc(fres, rinst.GetType(desc.size));
     return fres;
-
 }
 
 Value *Lifter::StoreRegister(Instance& rinst, RegisterDescription desc, llvm::Value *value, aarch64_shifter shift_type, uint8_t shift) {
@@ -159,8 +166,23 @@ Value *Lifter::StoreRegister(Instance& rinst, RegisterDescription desc, llvm::Va
     Value *&fres = GetRawRegister(desc, true);
     // Apply shift to value
     value = PerformShift(rinst, value, shift_type, shift);
-    // Set value after casting to full size
-    fres = rinst.builder->CreateIntCast(value, rinst.GetType(desc.GetFullTypeSize()), false, desc.GetName());
+    // Convert into full type (type of registers max. access size)
+    Type *reg_type = fres->getType();
+    Type *full_type = rinst.GetType(desc.GetFullTypeSize(), true);
+    if (!full_type->isVectorTy()) {
+        fres = rinst.builder->CreateIntCast(value, full_type, false, desc.GetName());
+    } else {
+        const auto full_size = desc.GetFullTypeSize();
+        DYNAUTIC_ASSERT(reg_type->getPrimitiveSizeInBits() == full_size);
+        Type *value_type = value->getType();
+        if (!value_type->isVectorTy()) {
+            if (value_type->getIntegerBitWidth() != full_size)
+                value = rinst.builder->CreateIntCast(value, rinst.GetType(full_size), false);
+            fres = rinst.builder->CreateBitCast(value, full_type);
+        } else {
+            DYNAUTIC_ASSERT(value_type->getPrimitiveSizeInBits() == full_size);
+        }
+    }
     return fres;
 }
 

@@ -219,23 +219,23 @@ void Lifter::SetupTrampolines(llvm::orc::LLJIT& jit) {
 llvm::FunctionCallee Lifter::GetMemoryRead(Instance& rinst, uint8_t bits) {
     switch (bits) {
     case 8: {
-        const auto ftype = llvm::FunctionType::get(rinst.builder->getInt8Ty(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty()}, false);
+        const auto ftype = llvm::FunctionType::get(rinst.GetType(8), {rinst.builder->getPtrTy(), rinst.GetType(64)}, false);
         return rinst.module->getOrInsertFunction("MemoryRead8", ftype);
     }
     case 16: {
-        const auto ftype = llvm::FunctionType::get(rinst.builder->getInt16Ty(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty()}, false);
+        const auto ftype = llvm::FunctionType::get(rinst.GetType(16), {rinst.builder->getPtrTy(), rinst.GetType(64)}, false);
         return rinst.module->getOrInsertFunction("MemoryRead16", ftype);
     }
     case 32: {
-        const auto ftype = llvm::FunctionType::get(rinst.builder->getInt32Ty(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty()}, false);
+        const auto ftype = llvm::FunctionType::get(rinst.GetType(32), {rinst.builder->getPtrTy(), rinst.GetType(64)}, false);
         return rinst.module->getOrInsertFunction("MemoryRead32", ftype);
     }
     case 64: {
-        const auto ftype = llvm::FunctionType::get(rinst.builder->getInt64Ty(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty()}, false);
+        const auto ftype = llvm::FunctionType::get(rinst.GetType(64), {rinst.builder->getPtrTy(), rinst.GetType(64)}, false);
         return rinst.module->getOrInsertFunction("MemoryRead64", ftype);
     }
     case 128: {
-        const auto ftype = llvm::FunctionType::get(rinst.builder->getInt128Ty(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty()}, false);
+        const auto ftype = llvm::FunctionType::get(rinst.GetType(128), {rinst.builder->getPtrTy(), rinst.GetType(64)}, false);
         return rinst.module->getOrInsertFunction("MemoryRead128", ftype);
     }
     default: DYNAUTIC_ASSERT(!"Invalid memory read width (bits != {8, 16, 32, 64, 128})");
@@ -246,23 +246,23 @@ llvm::FunctionCallee Lifter::GetMemoryRead(Instance& rinst, uint8_t bits) {
 llvm::FunctionCallee Lifter::GetMemoryWrite(Instance& rinst, uint8_t bits) {
     switch (bits) {
     case 8: {
-        const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty(), rinst.builder->getInt8Ty()}, false);
+        const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.GetType(64), rinst.GetType(8)}, false);
         return rinst.module->getOrInsertFunction("MemoryWrite8", ftype);
     }
     case 16: {
-        const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty(), rinst.builder->getInt16Ty()}, false);
+        const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.GetType(64), rinst.GetType(16)}, false);
         return rinst.module->getOrInsertFunction("MemoryWrite16", ftype);
     }
     case 32: {
-        const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty(), rinst.builder->getInt32Ty()}, false);
+        const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.GetType(64), rinst.GetType(32)}, false);
         return rinst.module->getOrInsertFunction("MemoryWrite32", ftype);
     }
     case 64: {
-        const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty(), rinst.builder->getInt64Ty()}, false);
+        const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.GetType(64), rinst.GetType(64)}, false);
         return rinst.module->getOrInsertFunction("MemoryWrite64", ftype);
     }
     case 128: {
-        const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty(), rinst.builder->getInt128Ty()}, false);
+        const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.GetType(64), rinst.GetType(128)}, false);
         return rinst.module->getOrInsertFunction("MemoryWrite128", ftype);
     }
     default: DYNAUTIC_ASSERT(!"Invalid memory write width (bits != {8, 16, 32, 64, 128})");
@@ -271,17 +271,17 @@ llvm::FunctionCallee Lifter::GetMemoryWrite(Instance& rinst, uint8_t bits) {
 }
 
 llvm::FunctionCallee Lifter::GetLiftTrampoline(Instance& rinst) {
-    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty()}, false);
+    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.GetType(64)}, false);
     return rinst.module->getOrInsertFunction("LiftTrampoline", ftype);
 }
 
 llvm::FunctionCallee Lifter::GetSvcTrampoline(Instance& rinst) {
-    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.builder->getInt32Ty()}, false);
+    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.GetType(32)}, false);
     return rinst.module->getOrInsertFunction("SvcTrampoline", ftype);
 }
 
 llvm::FunctionCallee Lifter::GetExceptionTrampoline(Instance& rinst) {
-    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty(), rinst.builder->getInt32Ty()}, false);
+    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.GetType(64), rinst.GetType(32)}, false);
     return rinst.module->getOrInsertFunction("ExceptionTrampoline", ftype);
 }
 
@@ -291,7 +291,7 @@ llvm::FunctionCallee Lifter::GetUpdateExecutionStateTrampoline(Instance& rinst) 
 }
 
 llvm::FunctionCallee Lifter::GetCreateDynamicBranchEntryTrampoline(Instance& rinst) {
-    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty(), rinst.builder->getInt64Ty()}, false);
+    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.GetType(64), rinst.GetType(64)}, false);
     return rinst.module->getOrInsertFunction("CreateDynamicBranchEntryTrampoline", ftype);
 }
 
@@ -301,28 +301,28 @@ llvm::FunctionCallee Lifter::GetFreezeTrampoline(Instance& rinst) {
 }
 
 llvm::FunctionCallee Lifter::GetExclusiveMonitorTagTrampoline(Instance& rinst) {
-    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty()}, false);
+    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.GetType(64)}, false);
     return rinst.module->getOrInsertFunction("ExclusiveMonitorTagTrampoline", ftype);
 }
 
 llvm::FunctionCallee Lifter::GetExclusiveMonitorUntagTrampoline(Instance& rinst) {
-    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty()}, false);
+    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.GetType(64)}, false);
     return rinst.module->getOrInsertFunction("ExclusiveMonitorUntagTrampoline", ftype);
 }
 
 llvm::FunctionCallee Lifter::GetExclusiveMonitorPoisonTrampoline(Instance& rinst) {
-    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty()}, false);
+    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.GetType(64)}, false);
     return rinst.module->getOrInsertFunction("ExclusiveMonitorPoisonTrampoline", ftype);
 }
 
 llvm::FunctionCallee Lifter::GetExclusiveMonitorIsPoisonedTrampoline(Instance& rinst) {
-    const auto ftype = llvm::FunctionType::get(rinst.builder->getInt8Ty(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty()}, false);
+    const auto ftype = llvm::FunctionType::get(rinst.GetType(8), {rinst.builder->getPtrTy(), rinst.GetType(64)}, false);
     return rinst.module->getOrInsertFunction("ExclusiveMonitorIsPoisonedTrampoline", ftype);
 }
 
 #ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
 llvm::FunctionCallee Lifter::GetDebugPrintTrampoline(Instance& rinst) {
-    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.builder->getInt64Ty()}, false);
+    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.GetType(64)}, false);
     return rinst.module->getOrInsertFunction("DebugPrintTrampoline", ftype);
 }
 

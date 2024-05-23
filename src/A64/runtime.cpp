@@ -120,7 +120,7 @@ void Runtime::Impl::CreateGlobals() {
     for (unsigned idx = 0; idx != 31; idx++)
         CreateGlobal(Type::getInt64Ty(*context), "general_register_"+std::to_string(idx));
     for (unsigned idx = 0; idx != 32; idx++)
-        CreateGlobal(Type::getInt128Ty(*context), "vector_register_"+std::to_string(idx));
+        CreateGlobal(FixedVectorType::get(Type::getInt64Ty(*context), 2), "vector_register_"+std::to_string(idx));
     CreateGlobal(Type::getInt64Ty(*context), "comparison_first");
     CreateGlobal(Type::getInt64Ty(*context), "comparison_second");
     CreateGlobal(Type::getInt8Ty(*context), "nzcv");

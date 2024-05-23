@@ -8,6 +8,8 @@ using namespace llvm::orc;
 
 namespace Dynautic::A64 {
 llvm::Value *Lifter::PerformShift(Instance& rinst, llvm::Value *value, aarch64_shifter type, Value *shift) {
+    DYNAUTIC_ASSERT(!(value->getType()->isVectorTy() && type != AArch64_SFT_INVALID));
+
     if (type == AArch64_SFT_INVALID)
         return value;
 

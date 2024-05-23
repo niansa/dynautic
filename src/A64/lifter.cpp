@@ -143,7 +143,6 @@ void Lifter::DeferLift(VAddr addr) {
 }
 
 void Lifter::LiftLeaf(Instance& rinst, VAddr addr) {
-    VAddr last_addr = addr;
     std::vector<VAddr> noexec_addrs;
 
     LoadBranchContext(rinst);
@@ -175,10 +174,6 @@ void Lifter::LiftLeaf(Instance& rinst, VAddr addr) {
                 break;
             }
         }
-
-        // Save last address for later
-        if (count != 0)
-            last_addr = insns[count-1].address + 4;
 
         // Clean up disassembly
         cs_free(insns, count);

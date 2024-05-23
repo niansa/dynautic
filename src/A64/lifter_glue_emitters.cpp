@@ -22,35 +22,35 @@ void Lifter::LoadFunctionContext(Instance& rinst, bool new_allocas) {
 
     // Fill in stack pointer
     if (new_allocas)
-        rt_allocas.stack_pointer = rinst.builder->CreateAlloca(rinst.builder->getInt64Ty(), nullptr, "alloca_sp_");
-    CreateLoadFromGlobalIntoPtr(rinst, "stack_pointer", rinst.builder->getInt64Ty(), rt_allocas.stack_pointer);
+        rt_allocas.stack_pointer = rinst.builder->CreateAlloca(rinst.GetType(64), nullptr, "alloca_sp_");
+    CreateLoadFromGlobalIntoPtr(rinst, "stack_pointer", rinst.GetType(64), rt_allocas.stack_pointer);
 
     // Fill in general purpose registers
     for (unsigned idx = 0; idx != rt_allocas.registers.size(); ++idx) {
         if (new_allocas)
-            rt_allocas.registers[idx] = rinst.builder->CreateAlloca(rinst.builder->getInt64Ty(), nullptr, "alloca_x"+std::to_string(idx)+'_');
-        CreateLoadFromGlobalIntoPtr(rinst, "general_register_"+std::to_string(idx), rinst.builder->getInt64Ty(), rt_allocas.registers[idx]);
+            rt_allocas.registers[idx] = rinst.builder->CreateAlloca(rinst.GetType(64), nullptr, "alloca_x"+std::to_string(idx)+'_');
+        CreateLoadFromGlobalIntoPtr(rinst, "general_register_"+std::to_string(idx), rinst.GetType(64), rt_allocas.registers[idx]);
     }
 
     // Fill in vector registers
     for (unsigned idx = 0; idx != rt_allocas.vectors.size(); ++idx) {
         if (new_allocas)
-            rt_allocas.vectors[idx] = rinst.builder->CreateAlloca(rinst.builder->getInt128Ty(), nullptr, "alloca_q"+std::to_string(idx)+'_');
-        CreateLoadFromGlobalIntoPtr(rinst, "vector_register_"+std::to_string(idx), rinst.builder->getInt128Ty(), rt_allocas.vectors[idx]);
+            rt_allocas.vectors[idx] = rinst.builder->CreateAlloca(rinst.GetType(128), nullptr, "alloca_q"+std::to_string(idx)+'_');
+        CreateLoadFromGlobalIntoPtr(rinst, "vector_register_"+std::to_string(idx), rinst.GetType(128), rt_allocas.vectors[idx]);
     }
 
     // Fill in comparisation
     if (new_allocas) {
-        rt_allocas.comparison.first = rinst.builder->CreateAlloca(rinst.builder->getInt64Ty(), nullptr, "alloca_comp_first_");
-        rt_allocas.comparison.second = rinst.builder->CreateAlloca(rinst.builder->getInt64Ty(), nullptr, "alloca_comp_second_");
+        rt_allocas.comparison.first = rinst.builder->CreateAlloca(rinst.GetType(64), nullptr, "alloca_comp_first_");
+        rt_allocas.comparison.second = rinst.builder->CreateAlloca(rinst.GetType(64), nullptr, "alloca_comp_second_");
     }
-    CreateLoadFromGlobalIntoPtr(rinst, "comparison_first", rinst.builder->getInt64Ty(), rt_allocas.comparison.first);
-    CreateLoadFromGlobalIntoPtr(rinst, "comparison_second", rinst.builder->getInt64Ty(), rt_allocas.comparison.second);
+    CreateLoadFromGlobalIntoPtr(rinst, "comparison_first", rinst.GetType(64), rt_allocas.comparison.first);
+    CreateLoadFromGlobalIntoPtr(rinst, "comparison_second", rinst.GetType(64), rt_allocas.comparison.second);
 
     // Fill in NZCV
     if (new_allocas)
-        rt_allocas.nzcv = rinst.builder->CreateAlloca(rinst.builder->getInt8Ty(), nullptr, "alloca_nzcv_");
-    CreateLoadFromGlobalIntoPtr(rinst, "nzcv", rinst.builder->getInt8Ty(), rt_allocas.nzcv);
+        rt_allocas.nzcv = rinst.builder->CreateAlloca(rinst.GetType(8), nullptr, "alloca_nzcv_");
+    CreateLoadFromGlobalIntoPtr(rinst, "nzcv", rinst.GetType(8), rt_allocas.nzcv);
 
     // Load branch context
     LoadBranchContext(rinst);
@@ -62,29 +62,29 @@ void Lifter::FinalizeFunctionContext(Instance& rinst) {
 
     // Write out stack pointer
     if (rt_allocas.dirty_stack_pointer)
-        CreateStoreToGlobal(rinst, "stack_pointer", rinst.builder->CreateLoad(rinst.builder->getInt64Ty(), rt_allocas.stack_pointer));
+        CreateStoreToGlobal(rinst, "stack_pointer", rinst.builder->CreateLoad(rinst.GetType(64), rt_allocas.stack_pointer));
 
     // Write out general purpose registers
     for (unsigned idx = 0; idx !=rt_allocas. registers.size(); ++idx) {
         if (rt_allocas.dirty_registers[idx])
-            CreateStoreToGlobal(rinst, "general_register_"+std::to_string(idx), rinst.builder->CreateLoad(rinst.builder->getInt64Ty(), rt_allocas.registers[idx]));
+            CreateStoreToGlobal(rinst, "general_register_"+std::to_string(idx), rinst.builder->CreateLoad(rinst.GetType(64), rt_allocas.registers[idx]));
     }
 
     // Write out vector registers
     for (unsigned idx = 0; idx != rt_allocas.vectors.size(); ++idx) {
         if (rt_allocas.dirty_vectors[idx])
-            CreateStoreToGlobal(rinst, "vector_register_"+std::to_string(idx), rinst.builder->CreateLoad(rinst.builder->getInt128Ty(), rt_allocas.vectors[idx]));
+            CreateStoreToGlobal(rinst, "vector_register_"+std::to_string(idx), rinst.builder->CreateLoad(rinst.GetType(128), rt_allocas.vectors[idx]));
     }
 
     // Write out comparisation
     if (rt_allocas.dirty_comparison) {
-        CreateStoreToGlobal(rinst, "comparison_first", rinst.builder->CreateLoad(rinst.builder->getInt64Ty(), rt_allocas.comparison.first));
-        CreateStoreToGlobal(rinst, "comparison_first", rinst.builder->CreateLoad(rinst.builder->getInt64Ty(), rt_allocas.comparison.second));
+        CreateStoreToGlobal(rinst, "comparison_first", rinst.builder->CreateLoad(rinst.GetType(64), rt_allocas.comparison.first));
+        CreateStoreToGlobal(rinst, "comparison_first", rinst.builder->CreateLoad(rinst.GetType(64), rt_allocas.comparison.second));
     }
 
     // Write out NZCV
     if (rt_allocas.dirty_nzcv)
-        CreateStoreToGlobal(rinst, "nzcv", rinst.builder->CreateLoad(rinst.builder->getInt8Ty(), rt_allocas.nzcv));
+        CreateStoreToGlobal(rinst, "nzcv", rinst.builder->CreateLoad(rinst.GetType(8), rt_allocas.nzcv));
 
     rt_allocas.dirty = false;
 }
@@ -102,22 +102,22 @@ void Lifter::LoadBranchContext(Instance& rinst) {
     rt_values.dirty = true;
 
     // Fill in stack pointer
-    rt_values.stack_pointer = rinst.builder->CreateLoad(rinst.builder->getInt64Ty(), rt_allocas.stack_pointer, "sp_");
+    rt_values.stack_pointer = rinst.builder->CreateLoad(rinst.GetType(64), rt_allocas.stack_pointer, "sp_");
 
     // Fill in general purpose registers
     for (unsigned idx = 0; idx != rt_values.registers.size(); ++idx)
-        rt_values.registers[idx] = rinst.builder->CreateLoad(rinst.builder->getInt64Ty(), rt_allocas.registers[idx], "x"+std::to_string(idx)+'_');
+        rt_values.registers[idx] = rinst.builder->CreateLoad(rinst.GetType(64), rt_allocas.registers[idx], "x"+std::to_string(idx)+'_');
 
     // Fill in vector registers
     for (unsigned idx = 0; idx != rt_values.vectors.size(); ++idx)
-        rt_values.vectors[idx] = rinst.builder->CreateLoad(rinst.builder->getInt128Ty(), rt_allocas.vectors[idx], "q"+std::to_string(idx)+'_');
+        rt_values.vectors[idx] = rinst.builder->CreateLoad(rinst.GetType(128, true), rt_allocas.vectors[idx], "q"+std::to_string(idx)+'_');
 
     // Fill in comparisation
-    rt_values.comparison.first = rinst.builder->CreateLoad(rinst.builder->getInt64Ty(), rt_allocas.comparison.first, "comp_first_");
-    rt_values.comparison.second = rinst.builder->CreateLoad(rinst.builder->getInt64Ty(), rt_allocas.comparison.second, "comp_second_");
+    rt_values.comparison.first = rinst.builder->CreateLoad(rinst.GetType(64), rt_allocas.comparison.first, "comp_first_");
+    rt_values.comparison.second = rinst.builder->CreateLoad(rinst.GetType(64), rt_allocas.comparison.second, "comp_second_");
 
     // Fill in NZCV
-    rt_values.nzcv = rinst.builder->CreateLoad(rinst.builder->getInt8Ty(), rt_allocas.nzcv, "nzcv_");
+    rt_values.nzcv = rinst.builder->CreateLoad(rinst.GetType(8), rt_allocas.nzcv, "nzcv_");
 }
 void Lifter::FinalizeBranchContext(Instance& rinst) {
     // Untag any tagged memory
@@ -331,7 +331,7 @@ void Lifter::CreateUseDynamicBranchCache(Instance& rinst, VAddr origin, Value *a
 
 void Lifter::CreateLiftTrampolineBlock(Instance& rinst, VAddr origin, bool no_cache) {
     Value *address_ptr = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(rinst.GetBranchAddrPtr())), rinst.builder->getPtrTy());
-    Value *address = rinst.builder->CreateLoad(rinst.builder->getInt64Ty(), address_ptr);
+    Value *address = rinst.builder->CreateLoad(rinst.GetType(64), address_ptr);
 
     if (!no_cache) {
         CreateUseDynamicBranchCache(rinst, origin, address);
