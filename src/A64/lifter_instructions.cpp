@@ -680,7 +680,7 @@ bool Lifter::InstructionLifter::Run() {
             const uint64_t total_bits = ops[0].size;
             const auto shr_bits = total_bits - detail.operands[3].imm;
             const auto shl_bits = shr_bits - detail.operands[2].imm;
-            // Generate instruction sequence leading to SBFX/UBFX on arm64
+            // Generate instructions
             Value *value = rinst.builder->CreateShl(p.GetRegisterView(rinst, ops[1]), shl_bits);
             if (extra_flags[signed_])
                 value = rinst.builder->CreateAShr(value, shr_bits);
@@ -697,7 +697,7 @@ bool Lifter::InstructionLifter::Run() {
             const auto lsb = detail.operands[2].imm;
             const auto width = detail.operands[3].imm;
             const auto sh_bits = total_bits - width;
-            // Generate instruction sequence replicating effect of SBFIZ/UBFIZ
+            // Generate instructions
             Value *value = rinst.builder->CreateShl(p.GetRegisterView(rinst, ops[1]), sh_bits);
             if (extra_flags[signed_])
                 value = rinst.builder->CreateAShr(value, sh_bits-lsb);
