@@ -689,6 +689,23 @@ bool Lifter::InstructionLifter::Run() {
             // Store result to output register
             p.StoreRegister(rinst, ops[0], value);
         } return;
+        case AArch64_INS_ALIAS_SBFIZ: extra_flags[signed_] = true; [[fallthrough]];
+        case AArch64_INS_ALIAS_UBFIZ: {
+            const auto ops = GetOps(2);
+            // Calculate bits
+            const uint64_t total_bits = ops[0].size;
+            const auto lsb = detail.operands[2].imm;
+            const auto width = detail.operands[3].imm;
+            const auto sh_bits = total_bits - width;
+            // Generate instruction sequence replicating effect of SBFIZ/UBFIZ
+            Value *value = rinst.builder->CreateShl(p.GetRegisterView(rinst, ops[1]), sh_bits);
+            if (extra_flags[signed_])
+                value = rinst.builder->CreateAShr(value, sh_bits-lsb);
+            else
+                value = rinst.builder->CreateLShr(value, sh_bits-lsb);
+            // Store result to output register
+            p.StoreRegister(rinst, ops[0], value);
+        } return;
         // Atomic store instructions
         case AArch64_INS_CAS:
         case AArch64_INS_CASA:
