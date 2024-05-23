@@ -228,17 +228,17 @@ void Lifter::InstructionLifter::DeferCompilation(bool repeat_instruction) {
 #define Handle2Ops(func) \
     do { \
         const auto ops = GetOps(2); \
-        p.StoreRegister(rinst, ops[0], func(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[1]), shift_type, shift))); \
+        p.StoreRegister(rinst, ops[0], rinst.builder->func(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[1]), shift_type, shift))); \
     } while (0)
 #define Handle3Ops(func) \
     do { \
         const auto ops = GetOps(3); \
-        p.StoreRegister(rinst, ops[0], func(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift), rinst.GetType(ops[1].size), false))); \
+        p.StoreRegister(rinst, ops[0], rinst.builder->func(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift), rinst.GetType(ops[1].size), false))); \
     } while (0)
 #define Handle3OpsNot(func) \
     do { \
         const auto ops = GetOps(3); \
-        p.StoreRegister(rinst, ops[0], func(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateNot(rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift), rinst.GetType(ops[1].size), false)))); \
+        p.StoreRegister(rinst, ops[0], rinst.builder->func(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateNot(rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift), rinst.GetType(ops[1].size), false)))); \
     } while (0)
 
 #define HandleShift(type) \
@@ -350,7 +350,7 @@ bool Lifter::InstructionLifter::Run() {
         } return;
         case AArch64_INS_ALIAS_AND:
         case AArch64_INS_AND: {
-            Handle3Ops(rinst.builder->CreateAnd);
+            Handle3Ops(CreateAnd);
         } return;
         case AArch64_INS_ALIAS_ANDS:
         case AArch64_INS_ANDS: {
@@ -366,7 +366,7 @@ bool Lifter::InstructionLifter::Run() {
         } return;
         case AArch64_INS_ALIAS_BIC:
         case AArch64_INS_BIC: {
-            Handle3OpsNot(rinst.builder->CreateAnd);
+            Handle3OpsNot(CreateAnd);
         } return;
         case AArch64_INS_ALIAS_BICS:
         case AArch64_INS_BICS: {
@@ -377,24 +377,24 @@ bool Lifter::InstructionLifter::Run() {
         } return;
         case AArch64_INS_ALIAS_ORR:
         case AArch64_INS_ORR: {
-            Handle3Ops(rinst.builder->CreateOr);
+            Handle3Ops(CreateOr);
         } return;
         case AArch64_INS_ALIAS_MVN:
         case AArch64_INS_MVNI:
         case AArch64_INS_ALIAS_ORN:
         case AArch64_INS_ORN: {
             if (detail.op_count == 2)
-                Handle2Ops(rinst.builder->CreateNot);
+                Handle2Ops(CreateNot);
             else
-                Handle3OpsNot(rinst.builder->CreateOr);
+                Handle3OpsNot(CreateOr);
         } return;
         case AArch64_INS_ALIAS_EOR:
         case AArch64_INS_EOR: {
-            Handle3Ops(rinst.builder->CreateXor);
+            Handle3Ops(CreateXor);
         } return;
         case AArch64_INS_ALIAS_EON:
         case AArch64_INS_EON: {
-            Handle3OpsNot(rinst.builder->CreateXor);
+            Handle3OpsNot(CreateXor);
         } return;
         case AArch64_INS_ALIAS_ASR:
         case AArch64_INS_ASR: {
@@ -429,7 +429,7 @@ bool Lifter::InstructionLifter::Run() {
         // Arithmetic instructions
         case AArch64_INS_ALIAS_ADD:
         case AArch64_INS_ADD: {
-            Handle3Ops(rinst.builder->CreateAdd);
+            Handle3Ops(CreateAdd);
         } return;
         case AArch64_INS_ALIAS_SUBS:
         case AArch64_INS_SUBS: {
@@ -441,7 +441,7 @@ bool Lifter::InstructionLifter::Run() {
         } [[fallthrough]];
         case AArch64_INS_ALIAS_SUB:
         case AArch64_INS_SUB: {
-            Handle3Ops(rinst.builder->CreateSub);
+            Handle3Ops(CreateSub);
         } return;
         case AArch64_INS_MSUB: {
             const auto ops = GetOps(4);
@@ -455,7 +455,7 @@ bool Lifter::InstructionLifter::Run() {
         } return;
         case AArch64_INS_ALIAS_NEG:
         case AArch64_INS_NEG: {
-            Handle2Ops(rinst.builder->CreateNeg);
+            Handle2Ops(CreateNeg);
         } return;
         case AArch64_INS_ALIAS_UMULL:
         case AArch64_INS_UMULL: {
@@ -468,7 +468,7 @@ bool Lifter::InstructionLifter::Run() {
         } break;
         case AArch64_INS_ALIAS_MUL:
         case AArch64_INS_MUL: {
-            Handle3Ops(rinst.builder->CreateMul);
+            Handle3Ops(CreateMul);
         } return;
         case AArch64_INS_UMULH: {
             const auto ops = GetOps(3);
