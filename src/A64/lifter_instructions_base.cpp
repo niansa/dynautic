@@ -91,6 +91,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
         RegisterDescription left;
         Value *right = nullptr;
         uint64_t right_imm;
+        DYNAUTIC_ASSERT(detail.op_count >= 2);
         for (unsigned op_idx = 0; op_idx != 2; ++op_idx) {
             const cs_aarch64_op& op = detail.operands[op_idx];
             switch(op.type) {
