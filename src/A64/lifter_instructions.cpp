@@ -197,7 +197,7 @@ bool Lifter::InstructionLifter::Run() {
     const uint64_t id = insn.is_alias ? insn.alias_id : insn.id;
 
     // Find function that could handle this instruction
-    auto handlers = {&InstructionLifter::BaseInstructions};
+    const auto handlers = {&InstructionLifter::BaseInstructions};
 
     bool handled = false;
     for (const auto handler : handlers) {
