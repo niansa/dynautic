@@ -149,7 +149,9 @@ Value *Lifter::GetRegisterView(Instance& rinst, RegisterDescription desc, Type *
         DYNAUTIC_ASSERT(current_type_size >= requested_type_size);
 
         if (requested_type_size < current_type_size) {
-            const auto new_width = static_cast<unsigned>(requested_type_size / (current_type_size / current_type->getScalarSizeInBits()));
+            auto new_width = static_cast<unsigned>(requested_type_size);
+            if (current_type->isVectorTy() && !as_type->isVectorTy())
+                new_width /= (current_type_size / current_type->getScalarSizeInBits());
             current_type = current_type->getWithNewBitWidth(new_width);
             fres = rinst.builder->CreateTrunc(fres, current_type);
         }
@@ -157,6 +159,7 @@ Value *Lifter::GetRegisterView(Instance& rinst, RegisterDescription desc, Type *
     // Bitcast as neded
     if (current_type != as_type)
         fres = rinst.builder->CreateBitCast(fres, as_type);
+
     return fres;
 }
 
@@ -180,23 +183,28 @@ Value *Lifter::StoreRegister(Instance& rinst, RegisterDescription desc, llvm::Va
     Value *&fres = GetRawRegister(desc, true);
     // Apply shift to value
     value = PerformShift(rinst, value, shift_type, shift);
-    // Convert into full type (type of registers max. access size)
+    // Extend as needed
     Type *reg_type = fres->getType();
-    Type *full_type = rinst.GetType(desc.GetFullTypeSize(), true);
-    if (!full_type->isVectorTy()) {
-        fres = rinst.builder->CreateIntCast(value, full_type, false, desc.GetName());
-    } else {
-        const auto full_size = desc.GetFullTypeSize();
-        DYNAUTIC_ASSERT(GetTypeSizeInBits(rinst, reg_type) == full_size);
-        Type *value_type = value->getType();
-        if (!value_type->isVectorTy()) {
-            if (value_type->getIntegerBitWidth() != full_size)
-                value = rinst.builder->CreateIntCast(value, rinst.GetType(full_size), false);
-            fres = rinst.builder->CreateBitCast(value, full_type);
-        } else {
-            DYNAUTIC_ASSERT(GetTypeSizeInBits(rinst, value_type) == full_size);
+    Type *current_type = value->getType();
+    if (current_type != reg_type) {
+        const auto current_type_size = GetTypeSizeInBits(rinst, current_type);
+        const auto reg_type_size = GetTypeSizeInBits(rinst, reg_type);
+        DYNAUTIC_ASSERT(reg_type_size >= current_type_size);
+
+        if (reg_type_size > current_type_size) {
+            auto new_width = static_cast<unsigned>(reg_type_size);
+            if (current_type->isVectorTy() && !reg_type->isVectorTy())
+                new_width *= (reg_type_size / reg_type->getScalarSizeInBits());
+            current_type = current_type->getWithNewBitWidth(new_width);
+            value = rinst.builder->CreateZExt(value, current_type);
         }
     }
+    // Bitcast as needed
+    if (current_type != reg_type)
+        value = rinst.builder->CreateBitCast(value, reg_type);
+    // Set register
+    fres = value;
+
     return fres;
 }
 
