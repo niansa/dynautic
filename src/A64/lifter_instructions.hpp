@@ -19,7 +19,7 @@ class Lifter::InstructionLifter {
     const cs_insn& insn;
     const cs_aarch64& detail;
 
-    std::array<bool, 6> extra_flags{};
+    std::array<bool, 8> extra_flags{};
 
     uint8_t shift = 0;
     aarch64_shifter shift_type = AArch64_SFT_INVALID;
