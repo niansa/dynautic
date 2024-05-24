@@ -168,7 +168,7 @@ void Lifter::FinalizeBranchContext(Instance& rinst) {
 }
 
 void Lifter::CreatePCSave(Instance& rinst) {
-    CreateStoreToPtr(rinst, &rt.pc, rinst.builder->getInt64(rinst.pc));
+    CreateStoreToPtr(rinst, &rt.pc, rinst.CreateInt(64, rinst.pc));
 }
 
 Value *Lifter::CreateLoadFromGlobal(Instance& rinst, llvm::StringRef global_name, llvm::Type *type) {
@@ -182,17 +182,17 @@ void Lifter::CreateStoreToGlobal(Instance& rinst, llvm::StringRef global_name, l
 }
 
 Value *Lifter::CreateLoadFromPtr(Instance& rinst, const void *ptr, Type *type, const llvm::Twine& name) {
-    return rinst.builder->CreateLoad(type, rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<uint64_t>(ptr)), rinst.builder->getPtrTy()), name);
+    return rinst.builder->CreateLoad(type, rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<uint64_t>(ptr)), rinst.builder->getPtrTy()), name);
 }
 void Lifter::CreateStoreToPtr(Instance& rinst, void *ptr, llvm::Value *value) {
-    rinst.builder->CreateStore(value, rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<uint64_t>(ptr)), rinst.builder->getPtrTy()));
+    rinst.builder->CreateStore(value, rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<uint64_t>(ptr)), rinst.builder->getPtrTy()));
 }
 
 Value *Lifter::CreateMemoryLoad(Instance& rinst, llvm::Value *address, Type *type, uint8_t alignment) {
     if (rt.conf.native_memory)
         return rinst.builder->CreateAlignedLoad(type, rinst.builder->CreateIntToPtr(address, rinst.builder->getPtrTy()), MaybeAlign(alignment));
 
-    Value *runtime = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
+    Value *runtime = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
     Value *fres = rinst.builder->CreateCall(GetMemoryRead(rinst, static_cast<uint8_t>(type->getIntegerBitWidth())), {runtime, address});
     if (rt.conf.check_halt_on_memory_access)
         rinst.builder->CreateCall(GetUpdateExecutionStateTrampoline(rinst), {runtime});
@@ -219,7 +219,7 @@ void Lifter::CreateMemoryStore(Instance& rinst, llvm::Value *address, llvm::Valu
         }
     }
 
-    Value *runtime = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
+    Value *runtime = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
     rinst.builder->CreateCall(GetMemoryWrite(rinst, static_cast<uint8_t>(data->getType()->getIntegerBitWidth())), {runtime, address, data});
     if (rt.conf.check_halt_on_memory_access)
         rinst.builder->CreateCall(GetUpdateExecutionStateTrampoline(rinst), {runtime});
@@ -235,7 +235,7 @@ void Lifter::CreateCall(Instance& rinst, VAddr origin, VAddr address) {
 
     // Use deferring lift if configured to
     if (!rt.conf.HasOptimization(OptimizationFlag::BlockLinking))
-        return CreateCall(rinst, origin, rinst.builder->getInt64(address));
+        return CreateCall(rinst, origin, rinst.CreateInt(64, address));
 
     // Prepare for call
     FinalizeFunctionContext(rinst);
@@ -252,7 +252,7 @@ void Lifter::CreateCall(Instance& rinst, VAddr origin, VAddr address) {
 llvm::BasicBlock *Lifter::PrepareBranch(Instance& rinst, VAddr origin, Value *address) {
     VAddr *addr;
     BasicBlock *block = rinst.QueueDynamicBranch(addr, origin, "DynamicBranchFrom"+std::to_string(origin));
-    Value *addr_ptr = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(addr)), rinst.builder->getPtrTy());
+    Value *addr_ptr = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(addr)), rinst.builder->getPtrTy());
     rinst.builder->CreateStore(address, addr_ptr);
     return block;
 }
@@ -261,7 +261,7 @@ llvm::BasicBlock *Lifter::PrepareBranch(Instance& rinst, VAddr address) {
 
     // Use dynamic branch if block linking is disabled
     if (!rt.conf.HasOptimization(OptimizationFlag::BlockLinking))
-        return PrepareBranch(rinst, rinst.pc, rinst.builder->getInt64(address));
+        return PrepareBranch(rinst, rinst.pc, rinst.CreateInt(64, address));
 
     return rinst.QueueBranch(address, "BranchAt"+std::to_string(address));
 }
@@ -306,7 +306,7 @@ void Lifter::CreateUseDynamicBranchCache(Instance& rinst, VAddr origin, Value *a
                 for (const auto& [address, uses] : entries) {
                     // Generate case
                     BasicBlock *cache_case = rinst.CreateBasicBlock("CacheCase");
-                    switch_->addCase(rinst.builder->getInt64(address), cache_case);
+                    switch_->addCase(rinst.CreateInt(64, address), cache_case);
                     // Generate basic block contents
                     rinst.UseBasicBlock(cache_case);
                     CreateCall(rinst, origin, address);
@@ -324,13 +324,13 @@ void Lifter::CreateUseDynamicBranchCache(Instance& rinst, VAddr origin, Value *a
 
     if (rt.conf.update_cache) {
         // Submit call into cache
-        Value *cache_ = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(&cache)), rinst.builder->getPtrTy());
-        rinst.builder->CreateCall(GetCreateDynamicBranchEntryTrampoline(rinst), {cache_, rinst.builder->getInt64(origin), addr});
+        Value *cache_ = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(&cache)), rinst.builder->getPtrTy());
+        rinst.builder->CreateCall(GetCreateDynamicBranchEntryTrampoline(rinst), {cache_, rinst.CreateInt(64, origin), addr});
     }
 }
 
 void Lifter::CreateLiftTrampolineBlock(Instance& rinst, VAddr origin, bool no_cache) {
-    Value *address_ptr = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(rinst.GetBranchAddrPtr())), rinst.builder->getPtrTy());
+    Value *address_ptr = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(rinst.GetBranchAddrPtr())), rinst.builder->getPtrTy());
     Value *address = rinst.builder->CreateLoad(rinst.GetType(64), address_ptr);
 
     if (!no_cache) {
@@ -339,7 +339,7 @@ void Lifter::CreateLiftTrampolineBlock(Instance& rinst, VAddr origin, bool no_ca
             return;
     }
 
-    Value *self = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(this)), rinst.builder->getPtrTy());
+    Value *self = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(this)), rinst.builder->getPtrTy());
 
     if (!rt.conf.fully_static) {
         FinalizeFunctionContext(rinst);
@@ -360,7 +360,7 @@ void Lifter::CreateLiftTrampoline(Instance& rinst, VAddr origin, Value *addr, bo
             return;
     }
 
-    Value *self = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(this)), rinst.builder->getPtrTy());
+    Value *self = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(this)), rinst.builder->getPtrTy());
 
     if (!rt.conf.fully_static) {
         CallInst *call = rinst.builder->CreateCall(GetLiftTrampoline(rinst), {self, addr});
@@ -372,25 +372,25 @@ void Lifter::CreateLiftTrampoline(Instance& rinst, VAddr origin, Value *addr, bo
 }
 
 void Lifter::CreateSvcTrampoline(Instance& rinst, uint32_t swi) {
-    Value *runtime = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
+    Value *runtime = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
 
     FinalizeFunctionContext(rinst);
     CreatePCSave(rinst);
-    rinst.builder->CreateCall(GetSvcTrampoline(rinst), {runtime, rinst.builder->getInt32(swi)});
+    rinst.builder->CreateCall(GetSvcTrampoline(rinst), {runtime, rinst.CreateInt(32, swi)});
     LoadFunctionContext(rinst);
 }
 
 void Lifter::CreateExceptionTrampoline(Instance& rinst, Exception exception) {
-    Value *runtime = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
+    Value *runtime = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
 
     FinalizeFunctionContext(rinst);
     CreatePCSave(rinst);
-    rinst.builder->CreateCall(GetExceptionTrampoline(rinst), {runtime, rinst.builder->getInt64(rinst.pc), rinst.builder->getInt32(static_cast<uint32_t>(exception))});
-    CreateLiftTrampoline(rinst, rinst.pc, rinst.builder->getInt64(rinst.pc));
+    rinst.builder->CreateCall(GetExceptionTrampoline(rinst), {runtime, rinst.CreateInt(64, rinst.pc), rinst.CreateInt(32, static_cast<uint32_t>(exception))});
+    CreateLiftTrampoline(rinst, rinst.pc, rinst.CreateInt(64, rinst.pc));
 }
 
 void Lifter::CreateFreezeTrampoline(Instance& rinst) {
-    Value *runtime = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
+    Value *runtime = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
 
     FinalizeFunctionContext(rinst);
     CreatePCSave(rinst);
@@ -407,30 +407,30 @@ void Lifter::CreateExclusiveMonitorTagTrampoline(Instance& rinst, llvm::Value *a
     if (rt_values.exclusive_monitor)
         CreateExclusiveMonitorUntagTrampoline(rinst, rt_values.exclusive_monitor);
 
-    Value *runtime = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
+    Value *runtime = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
 
     rinst.builder->CreateCall(GetExclusiveMonitorTagTrampoline(rinst), {runtime, addr});
     rt_values.exclusive_monitor = addr;
 }
 
 void Lifter::CreateExclusiveMonitorUntagTrampoline(Instance& rinst, llvm::Value *addr) {
-    Value *runtime = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
+    Value *runtime = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
 
     rinst.builder->CreateCall(GetExclusiveMonitorUntagTrampoline(rinst), {runtime, addr});
     rt_values.exclusive_monitor = nullptr;
 }
 
 void Lifter::CreateExclusiveMonitorPoisonTrampoline(Instance& rinst, llvm::Value *addr) {
-    Value *runtime = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
+    Value *runtime = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
 
     rinst.builder->CreateCall(GetExclusiveMonitorPoisonTrampoline(rinst), {runtime, addr});
 }
 
 llvm::Value *Lifter::CreateExclusiveMonitorIsPoisonedTrampoline(Instance& rinst, llvm::Value *addr) {
-    Value *runtime = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
+    Value *runtime = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
 
     Value *result = rinst.builder->CreateCall(GetExclusiveMonitorIsPoisonedTrampoline(rinst), {runtime, addr});
-    return rinst.builder->CreateICmpNE(result, rinst.builder->getInt8(0));
+    return rinst.builder->CreateICmpNE(result, rinst.CreateInt(8, 0));
 }
 
 void Lifter::CreateDebugPrintTrampoline(Instance& rinst, const char *message) {
@@ -441,9 +441,9 @@ void Lifter::CreateDebugPrintTrampoline(Instance& rinst, const char *message) {
     if (known_messages.count(message) == 0)
         outs() << "Runtime debug message: Message \"" << message << "\" maps to " << reinterpret_cast<VAddr>(message) << '\n';
     known_messages.emplace(message);
-    Value *msg = rinst.builder->CreateIntToPtr(rinst.builder->getInt64(reinterpret_cast<VAddr>(message)), rinst.builder->getPtrTy());
+    Value *msg = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(message)), rinst.builder->getPtrTy());
 
-    rinst.builder->CreateCall(GetDebugPrintTrampoline(rinst), {msg, rinst.builder->getInt64(rinst.pc)});
+    rinst.builder->CreateCall(GetDebugPrintTrampoline(rinst), {msg, rinst.CreateInt(64, rinst.pc)});
 #else
     (void)rinst;
     (void)message;

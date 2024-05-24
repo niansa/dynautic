@@ -409,7 +409,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
         Type *type = rinst.GetType(ops[0].size);
         Value *reference = GetMemOpReference(false, 2);
         p.StoreRegister(rinst, ops[0], rinst.builder->CreateIntCast(p.CreateMemoryLoad(rinst, reference, rinst.GetType(32)), type, true));
-        reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
+        reference = rinst.builder->CreateAdd(reference, rinst.CreateInt(64, ops[0].size/8));
         p.StoreRegister(rinst, ops[1], rinst.builder->CreateIntCast(p.CreateMemoryLoad(rinst, reference, rinst.GetType(32)), type, true));
     } return true;
     case AArch64_INS_LDXP: extra_flags[exclusive] = true; [[fallthrough]];
@@ -441,7 +441,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
         const uint8_t bsiz = ops[0].size/8;
         const uint8_t alignment = extra_flags[exclusive]?bsiz:0;
         p.StoreRegister(rinst, ops[0], p.CreateMemoryLoad(rinst, reference, type, alignment*2));
-        reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(bsiz));
+        reference = rinst.builder->CreateAdd(reference, rinst.CreateInt(64, bsiz));
         p.StoreRegister(rinst, ops[1], p.CreateMemoryLoad(rinst, reference, type, alignment));
     } return true;
     case AArch64_INS_ALIAS_STP:
@@ -449,7 +449,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
         const auto ops = GetOps(2);
         Value *reference = GetMemOpReference(false, 2);
         p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[0]));
-        reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
+        reference = rinst.builder->CreateAdd(reference, rinst.CreateInt(64, ops[0].size/8));
         p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[1]));
     } return true;
     case AArch64_INS_ALIAS_SBFX: extra_flags[signed_] = true; [[fallthrough]];
@@ -580,13 +580,13 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
                 rinst.builder->CreateBr(continue_branch);
                 rinst.UseBasicBlock(continue_branch);
                 // Store result in register
-                p.StoreRegister(rinst, ops[0], rinst.builder->CreateSelect(poisoned, rinst.builder->getInt32(1), rinst.builder->getInt32(0)));
+                p.StoreRegister(rinst, ops[0], rinst.builder->CreateSelect(poisoned, rinst.CreateInt(32, 1), rinst.CreateInt(32, 0)));
 #ifdef __aarch64__
             }
 #endif
         } else {
             p.CreateMemoryStore(rinst, reference, value, true);
-            p.StoreRegister(rinst, ops[0], rinst.builder->getInt32(0));
+            p.StoreRegister(rinst, ops[0], rinst.CreateInt(32, 0));
         }
     } return true;
     case AArch64_INS_STLXP:
@@ -617,18 +617,18 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
                 rinst.builder->CreateCondBr(poisoned, continue_branch, no_poison_branch);
                 rinst.UseBasicBlock(no_poison_branch);
                 p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[1]));
-                reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[1].size/8));
+                reference = rinst.builder->CreateAdd(reference, rinst.CreateInt(64, ops[1].size/8));
                 p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[2]));
                 rinst.builder->CreateBr(continue_branch);
                 rinst.UseBasicBlock(continue_branch);
                 // Store result in register
-                p.StoreRegister(rinst, ops[0], rinst.builder->CreateSelect(poisoned, rinst.builder->getInt32(1), rinst.builder->getInt32(0)));
+                p.StoreRegister(rinst, ops[0], rinst.builder->CreateSelect(poisoned, rinst.CreateInt(32, 1), rinst.CreateInt(32, 0)));
 #ifdef __aarch64__
             }
 #endif
         } else {
             p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[0]));
-            reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt64(ops[0].size/8));
+            reference = rinst.builder->CreateAdd(reference, rinst.CreateInt(64, ops[0].size/8));
             p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[1]));
         }
     } return true;
@@ -636,7 +636,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
     case AArch64_INS_BL: {
         // Use BLR implementation if address is immediate
         if (detail.operands[0].type != AArch64_OP_IMM) {
-            p.StoreRegister(rinst, "x30", rinst.builder->getInt64(insn.address+4));
+            p.StoreRegister(rinst, "x30", rinst.CreateInt(64, insn.address+4));
             CreateCall(0);
             return true;
         }
@@ -650,7 +650,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
             p.CreateFreezeTrampoline(rinst);
             return true;
         }
-        p.StoreRegister(rinst, "x30", rinst.builder->getInt64(insn.address+4));
+        p.StoreRegister(rinst, "x30", rinst.CreateInt(64, insn.address+4));
         if (static_cast<VAddr>(op.imm) == insn.address+4) {
             // Don't call since target address is next instruction
             return true;
@@ -666,7 +666,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
         p.FinalizeBranchContext(rinst);
         const VAddr false_addr = insn.address+4;
         const auto pred = extra_flags[0]?ICmpInst::ICMP_NE:ICmpInst::ICMP_EQ;
-        Value *cond = rinst.builder->CreateICmp(pred, rinst.builder->CreateIntCast(p.GetRegisterView(rinst, GetOps(1)[0]), rinst.GetType(64), false), rinst.builder->getInt64(0));
+        Value *cond = rinst.builder->CreateICmp(pred, rinst.builder->CreateIntCast(p.GetRegisterView(rinst, GetOps(1)[0]), rinst.GetType(64), false), rinst.CreateInt(64, 0));
         p.CreateConditionalBranch(rinst, PrepareBranch(1), p.PrepareBranch(rinst, false_addr), cond);
     } return true;
     case AArch64_INS_TBNZ: extra_flags[0] = true; [[fallthrough]];
@@ -707,15 +707,15 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
         DYNAUTIC_ASSERT(src.type == AArch64_OP_SYSREG);
         Value *value = nullptr;
         switch (src.sysop.reg.sysreg) {
-        case AArch64_SYSREG_CNTFRQ_EL0: value = rinst.builder->getInt32(rinst.rt.conf.cntfrq_el0); break;
-        case AArch64_SYSREG_CTR_EL0: value = rinst.builder->getInt32(rinst.rt.conf.ctr_el0); break;
-        case AArch64_SYSREG_DCZID_EL0: value = rinst.builder->getInt32(rinst.rt.conf.dczid_el0); break;
+        case AArch64_SYSREG_CNTFRQ_EL0: value = rinst.CreateInt(32, rinst.rt.conf.cntfrq_el0); break;
+        case AArch64_SYSREG_CTR_EL0: value = rinst.CreateInt(32, rinst.rt.conf.ctr_el0); break;
+        case AArch64_SYSREG_DCZID_EL0: value = rinst.CreateInt(32, rinst.rt.conf.dczid_el0); break;
         case AArch64_SYSREG_TPIDRRO_EL0: value = p.CreateLoadFromPtr(rinst, reinterpret_cast<const void *>(rinst.rt.conf.tpidrro_el0), rinst.GetType(64)); break;
         case AArch64_SYSREG_TPIDR_EL0: value = p.CreateLoadFromPtr(rinst, reinterpret_cast<const void *>(rinst.rt.conf.tpidr_el0), rinst.GetType(64)); break;
         default: {
             DYNAUTIC_ASSERT(!"Unknown MRS access");
             if (rinst.rt.conf.unsafe_unexpected_situation_handling) {
-                value = rinst.builder->getInt64(0);
+                value = rinst.CreateInt(64, 0);
             } else {
                 p.CreateExceptionTrampoline(rinst, Exception::UnpredictableInstruction);
                 break;

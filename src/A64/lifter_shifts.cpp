@@ -24,7 +24,7 @@ llvm::Value *Lifter::PerformShift(Instance& rinst, llvm::Value *value, aarch64_s
     }
 }
 llvm::Value *Lifter::PerformShift(Instance& rinst, llvm::Value *value, aarch64_shifter type, uint8_t shift) {
-    return PerformShift(rinst, value, type, rinst.builder->getInt64(shift));
+    return PerformShift(rinst, value, type, rinst.CreateInt(64, shift));
 }
 
 uint64_t Lifter::PerformShift(uint64_t value, uint8_t bits, aarch64_shifter type, uint8_t shift) {

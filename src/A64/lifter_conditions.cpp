@@ -21,7 +21,7 @@ enum NZCV : uint8_t {
 
 
 Value *Lifter::InstructionLifter::ToInt1(llvm::Value *value, bool invert) {
-    return rinst.builder->CreateICmp(invert?CmpInst::ICMP_EQ:CmpInst::ICMP_NE, value, rinst.builder->getInt8(0));
+    return rinst.builder->CreateICmp(invert?CmpInst::ICMP_EQ:CmpInst::ICMP_NE, value, rinst.CreateInt(8, 0));
 }
 
 Value *Lifter::InstructionLifter::GetNZCVCondition() {
@@ -61,7 +61,7 @@ Value *Lifter::InstructionLifter::GetNZCVCondition() {
     } break;
     case AArch64CC_NV: invert = true; [[fallthrough]];
     case AArch64CC_AL: {
-        condition = rinst.builder->getInt8(1);
+        condition = rinst.CreateInt(8, 1);
     } break;
     case AArch64CC_Invalid: DYNAUTIC_ASSERT(!"Invalid condition");
     }
@@ -184,19 +184,19 @@ void Lifter::InstructionLifter::SetZFromInt(llvm::Value *value) {
 }
 
 llvm::Value *Lifter::InstructionLifter::GetN(llvm::Value *value) {
-    return rinst.builder->CreateSelect(value, rinst.builder->getInt8(n), rinst.builder->getInt8(0));
+    return rinst.builder->CreateSelect(value, rinst.CreateInt(8, n), rinst.CreateInt(8, 0));
 }
 
 llvm::Value *Lifter::InstructionLifter::GetZ(llvm::Value *value) {
-    return rinst.builder->CreateSelect(value, rinst.builder->getInt8(z), rinst.builder->getInt8(0));
+    return rinst.builder->CreateSelect(value, rinst.CreateInt(8, z), rinst.CreateInt(8, 0));
 }
 
 llvm::Value *Lifter::InstructionLifter::GetC(llvm::Value *value) {
-    return rinst.builder->CreateSelect(value, rinst.builder->getInt8(c), rinst.builder->getInt8(0));
+    return rinst.builder->CreateSelect(value, rinst.CreateInt(8, c), rinst.CreateInt(8, 0));
 }
 
 llvm::Value *Lifter::InstructionLifter::GetV(llvm::Value *value) {
-    return rinst.builder->CreateSelect(value, rinst.builder->getInt8(v), rinst.builder->getInt8(0));
+    return rinst.builder->CreateSelect(value, rinst.CreateInt(8, v), rinst.CreateInt(8, 0));
 }
 
 void Lifter::InstructionLifter::SetNZCV(llvm::Value *n, llvm::Value *z, llvm::Value *c, llvm::Value *v) {

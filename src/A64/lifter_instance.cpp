@@ -71,4 +71,8 @@ Type *Lifter::Instance::GetType(uint8_t bits, bool allow_vector) {
     DYNAUTIC_ASSERT(!"Invalid bit count");
     return nullptr;
 }
+
+ConstantInt *Lifter::Instance::CreateInt(uint8_t bits, uint64_t value) {
+    return ConstantInt::get(reinterpret_cast<IntegerType*>(GetType(bits, false)), value);
+}
 }

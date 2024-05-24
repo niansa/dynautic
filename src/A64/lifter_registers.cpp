@@ -97,23 +97,23 @@ TypeSize Lifter::GetTypeSizeInBits(Instance& rinst, Type *type) {
     return rinst.module->getDataLayout().getTypeSizeInBits(type);
 }
 
-Value *&Lifter::GetRawRegister(RegisterDescription desc, bool allow_store_to) {
+Value *&Lifter::GetRawRegister(RegisterDescription desc, bool allow_overwrite) {
     DYNAUTIC_ASSERT(!desc.IsZero());
 
     switch (desc.type) {
     case RegisterDescription::Type::scratch: return rt_values.scratch_registers[desc.idx];
     case RegisterDescription::Type::general: {
-        if (allow_store_to)
+        if (allow_overwrite)
             rt_values.dirty_registers[desc.idx] = true;
         return rt_values.registers[desc.idx];
     } break;
     case RegisterDescription::Type::vector: {
-        if (allow_store_to)
+        if (allow_overwrite)
             rt_values.dirty_vectors[desc.idx] = true;
         return rt_values.vectors[desc.idx];
     } break;
     case RegisterDescription::Type::stack_pointer: {
-        if (allow_store_to)
+        if (allow_overwrite)
             rt_values.dirty_stack_pointer = true;
         return rt_values.stack_pointer;
     }
@@ -131,7 +131,7 @@ Value *Lifter::GetRegisterView(Instance& rinst, RegisterDescription desc, bool a
     if (desc.type == RegisterDescription::Type::invalid) {
         DYNAUTIC_ASSERT(!"Invalid register type");
         if (rt.conf.unsafe_unexpected_situation_handling)
-            return rinst.builder->getInt32(0);
+            return rinst.CreateInt(32, 0);
         else
             CreateExceptionTrampoline(rinst, Exception::UnpredictableInstruction);
     }
@@ -159,7 +159,7 @@ Value *Lifter::StoreRegister(Instance& rinst, RegisterDescription desc, llvm::Va
     if (desc.type == RegisterDescription::Type::invalid) {
         DYNAUTIC_ASSERT(!"Invalid register type");
         if (rt.conf.unsafe_unexpected_situation_handling)
-            return rinst.builder->getInt32(0);
+            return rinst.CreateInt(32, 0);
         else
             CreateExceptionTrampoline(rinst, Exception::UnpredictableInstruction);
     }
@@ -201,7 +201,7 @@ Value *Lifter::StoreRegister16(Instance& rinst, RegisterDescription desc, uint16
     Value *&fres = GetRawRegister(desc, true);
     if (keep) {
         // Mask out existing bits
-        Value *mask = rinst.builder->getInt64(~(PerformShift(0xffff, desc.size, shift_type, shift)));
+        Value *mask = rinst.CreateInt(64, ~(PerformShift(0xffff, desc.size, shift_type, shift)));
         fres = rinst.builder->CreateAnd(fres, mask);
         // Merge shifted value into result
         fres = rinst.builder->CreateOr(fres, PerformShift(value, desc.size, shift_type, shift));
@@ -209,7 +209,7 @@ Value *Lifter::StoreRegister16(Instance& rinst, RegisterDescription desc, uint16
         if (desc.size == RegisterDescription::word)
             fres = rinst.builder->CreateAnd(fres, 0xffffffff);
     } else {
-        fres = rinst.builder->getInt64(PerformShift(value, desc.size, shift_type, shift));
+        fres = rinst.CreateInt(64, PerformShift(value, desc.size, shift_type, shift));
     }
     fres->setName(desc.GetName());
     return fres;

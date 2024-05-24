@@ -83,6 +83,7 @@ public:
     }
 
     llvm::Type *GetType(uint8_t bits, bool allow_vector = false);
+    llvm::ConstantInt *CreateInt(uint8_t bits, uint64_t value);
 };
 }
 

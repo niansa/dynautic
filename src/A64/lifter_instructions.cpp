@@ -47,7 +47,7 @@ uint16_t Lifter::InstructionLifter::GetImm16WithShift(uint64_t value) {
 RegisterDescription Lifter::InstructionLifter::GetImmAsReg(const cs_aarch64_op& op, bool as_word) {
     auto fres = p.AllocateScratchRegister(as_word);
     const auto imm = GetImm(op);
-    p.GetRawRegister(fres, true) = as_word?rinst.builder->getInt32(static_cast<uint32_t>(imm)):rinst.builder->getInt64(imm);
+    p.GetRawRegister(fres, true) = as_word?rinst.CreateInt(32, static_cast<uint32_t>(imm)):rinst.CreateInt(64, imm);
     return fres;
 }
 
@@ -69,7 +69,7 @@ std::array<RegisterDescription, Lifter::InstructionLifter::GetOps_max_op_count> 
         case AArch64_OP_MEM_REG: {
             // Add up references
             Value *reference = rinst.builder->CreateAdd(p.GetRegisterView(rinst, {p.cs_handle, op.mem.base}), p.GetRegisterView(rinst, {p.cs_handle, op.mem.index}));
-            reference = rinst.builder->CreateAdd(reference, rinst.builder->getInt32(op.mem.disp));
+            reference = rinst.builder->CreateAdd(reference, rinst.CreateInt(32, op.mem.disp));
             // Load value from reference
             DYNAUTIC_ASSERT(op_idx != 0);
             auto value_reg = p.AllocateScratchRegister(regs[0].size == RegisterDescription::word);
@@ -159,7 +159,7 @@ Value *Lifter::InstructionLifter::GetMemOpReference(bool unscaled, unsigned op_i
 
 void Lifter::InstructionLifter::DeferCompilation(bool repeat_instruction) {
     // Below function terminates the block
-    p.CreateLiftTrampoline(rinst, insn.address, rinst.builder->getInt64(insn.address+(repeat_instruction?0:4)));
+    p.CreateLiftTrampoline(rinst, insn.address, rinst.CreateInt(64, insn.address+(repeat_instruction?0:4)));
 }
 
 bool Lifter::InstructionLifter::Run() {    
