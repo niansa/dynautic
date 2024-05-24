@@ -127,7 +127,7 @@ Value *&Lifter::GetRawRegister(RegisterDescription desc, bool allow_overwrite) {
     }
 }
 
-Value *Lifter::GetRegisterView(Instance& rinst, RegisterDescription desc, bool allow_vector) {
+Value *Lifter::GetRegisterView(Instance& rinst, RegisterDescription desc, Type *as_type) {
     if (desc.type == RegisterDescription::Type::invalid) {
         DYNAUTIC_ASSERT(!"Invalid register type");
         if (rt.conf.unsafe_unexpected_situation_handling)
@@ -141,18 +141,27 @@ Value *Lifter::GetRegisterView(Instance& rinst, RegisterDescription desc, bool a
         return ConstantInt::get(rinst.GetType(desc.size), 0);
     // Get real register from list
     Value *fres = GetRawRegister(desc, false);
-    // Convert from vector to integer as needed
-    Type *type = fres->getType();
-    const auto type_size = GetTypeSizeInBits(rinst, type);
-    if (type->isVectorTy() && (!allow_vector || type_size != desc.size)) {
-        DYNAUTIC_ASSERT(type_size >= desc.size);
-        type = rinst.GetType(static_cast<uint8_t>(type_size), allow_vector);
-        fres = rinst.builder->CreateBitCast(fres, type);
-    }
     // Truncate as needed
-    if (!type->isVectorTy())
-        fres = rinst.builder->CreateTrunc(fres, rinst.GetType(desc.size));
+    Type *current_type = fres->getType();
+    if (current_type != as_type) {
+        const auto current_type_size = GetTypeSizeInBits(rinst, current_type);
+        const auto requested_type_size = GetTypeSizeInBits(rinst, as_type);
+        DYNAUTIC_ASSERT(current_type_size >= requested_type_size);
+
+        if (requested_type_size < current_type_size) {
+            const auto new_width = static_cast<unsigned>(requested_type_size / (current_type_size / current_type->getScalarSizeInBits()));
+            current_type = current_type->getWithNewBitWidth(new_width);
+            fres = rinst.builder->CreateTrunc(fres, current_type);
+        }
+    }
+    // Bitcast as neded
+    if (current_type != as_type)
+        fres = rinst.builder->CreateBitCast(fres, as_type);
     return fres;
+}
+
+Value *Lifter::GetRegisterView(Instance& rinst, RegisterDescription desc, bool allow_vector) {
+    return GetRegisterView(rinst, desc, rinst.GetType(desc.size, allow_vector));
 }
 
 Value *Lifter::StoreRegister(Instance& rinst, RegisterDescription desc, llvm::Value *value, aarch64_shifter shift_type, uint8_t shift) {

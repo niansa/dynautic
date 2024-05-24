@@ -94,6 +94,7 @@ class Lifter {
     llvm::TypeSize GetTypeSizeInBits(Instance&, llvm::Type *);
 
     llvm::Value *&GetRawRegister(RegisterDescription, bool allow_overwrite);
+    llvm::Value *GetRegisterView(Instance&, RegisterDescription, llvm::Type *);
     llvm::Value *GetRegisterView(Instance&, RegisterDescription, bool allow_vector = false);
     llvm::Value *StoreRegister(Instance&, RegisterDescription, llvm::Value *, aarch64_shifter shift_type = AArch64_SFT_INVALID, uint8_t shift = 0);
     llvm::Value *StoreRegister16(Instance&, RegisterDescription, uint16_t value, bool keep, aarch64_shifter shift_type = AArch64_SFT_INVALID, uint8_t shift = 0);
