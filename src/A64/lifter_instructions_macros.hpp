@@ -13,12 +13,12 @@
 #define Handle3Ops(func) \
     do { \
         const auto ops = GetOps(3); \
-        p.StoreRegister(rinst, ops[0], rinst.builder->func(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift), rinst.GetType(ops[1].size), false))); \
+p.StoreRegister(rinst, ops[0], rinst.builder->func(p.GetRegisterView(rinst, ops[1]), p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2], rinst.GetType(ops[1].size)), shift_type, shift))); \
     } while (0)
 #define Handle3OpsNot(func) \
     do { \
         const auto ops = GetOps(3); \
-        p.StoreRegister(rinst, ops[0], rinst.builder->func(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateNot(rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift), rinst.GetType(ops[1].size), false)))); \
+        p.StoreRegister(rinst, ops[0], rinst.builder->func(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateNot(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2], rinst.GetType(ops[1].size)), shift_type, shift)))); \
     } while (0)
 
 #define HandleShift(type) \

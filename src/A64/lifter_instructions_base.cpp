@@ -142,13 +142,13 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
     case AArch64_INS_ALIAS_ANDS:
     case AArch64_INS_ANDS: {
         const auto ops = GetOps(3);
-        Value *result = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift), rinst.GetType(ops[1].size), false));
+        Value *result = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[1]), p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2], rinst.GetType(ops[1].size)), shift_type, shift));
         p.StoreRegister(rinst, ops[0], result);
         SetNZFromInt(result);
     } return true;
     case AArch64_INS_ALIAS_TST: {
         const auto ops = GetOps(2);
-        Value *result = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[0]), rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[1]), shift_type, shift), rinst.GetType(ops[0].size), false));
+        Value *result = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[0]), p.PerformShift(rinst, p.GetRegisterView(rinst, ops[1], rinst.GetType(ops[0].size)), shift_type, shift));
         SetNZFromInt(result);
     } return true;
     case AArch64_INS_ALIAS_BIC:
@@ -158,7 +158,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
     case AArch64_INS_ALIAS_BICS:
     case AArch64_INS_BICS: {
         const auto ops = GetOps(3);
-        Value *result = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateNot(rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift), rinst.GetType(ops[1].size), false)));
+        Value *result = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateNot(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2], rinst.GetType(ops[1].size)), shift_type, shift)));
         p.StoreRegister(rinst, ops[0], result);
         SetNZFromInt(result);
     } return true;
@@ -221,7 +221,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
     case AArch64_INS_SUBS: {
         const auto ops = GetOps(3);
         Value *left = p.GetRegisterView(rinst, ops[1]);
-        Value *right = p.PerformShift(rinst, rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[2]), rinst.GetType(ops[1].size), false), shift_type, shift);
+        Value *right = p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2], rinst.GetType(ops[1].size)), shift_type, shift);
         SetComparison(left, right);
         p.StoreRegister(rinst, ops[0], rinst.builder->CreateSub(left, right));
     } [[fallthrough]];
@@ -258,8 +258,8 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
     } return true;
     case AArch64_INS_UMULH: {
         const auto ops = GetOps(3);
-        Value *left = rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[1]), rinst.builder->getInt128Ty(), false);
-        Value *right = rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift), rinst.builder->getInt128Ty(), false);
+        Value *left = rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[1]), rinst.GetType(128), false);
+        Value *right = rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift), rinst.GetType(128), false);
         Value *result = rinst.builder->CreateMul(left, right);
         result = rinst.builder->CreateLShr(result, 64);
         p.StoreRegister(rinst, ops[0], rinst.builder->CreateIntCast(result, rinst.GetType(64), false));
@@ -305,7 +305,6 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
     case AArch64_INS_ALIAS_SXTW:
     case AArch64_INS_SXTW: extra_flags[word] = true; {
             const auto ops = GetOps(2);
-            Value *right_value = p.GetRegisterView(rinst, ops[1]);
             Type *source = nullptr;
             if (extra_flags[byte])
                 source = rinst.GetType(8);
@@ -315,7 +314,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
                 source = rinst.GetType(32);
             else
                 DYNAUTIC_ASSERT(!"Invalid source width in sign extend");
-            right_value = rinst.builder->CreateIntCast(right_value, source, false);
+            Value *right_value = p.GetRegisterView(rinst, ops[1], source);
             p.StoreRegister(rinst, ops[0], rinst.builder->CreateIntCast(right_value, rinst.GetType(64), true));
         } return true;
     case AArch64_INS_ALIAS_CMN: extra_flags[0] = true; [[fallthrough]];
