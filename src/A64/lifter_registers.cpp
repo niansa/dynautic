@@ -93,6 +93,10 @@ RegisterDescription Lifter::AllocateScratchRegister(bool as_word) {
     return "xzr";
 }
 
+TypeSize Lifter::GetTypeSizeInBits(Instance& rinst, Type *type) {
+    return rinst.module->getDataLayout().getTypeSizeInBits(type);
+}
+
 Value *&Lifter::GetRawRegister(RegisterDescription desc, bool allow_store_to) {
     DYNAUTIC_ASSERT(!desc.IsZero());
 
@@ -139,9 +143,10 @@ Value *Lifter::GetRegisterView(Instance& rinst, RegisterDescription desc, bool a
     Value *fres = GetRawRegister(desc, false);
     // Convert from vector to integer as needed
     Type *type = fres->getType();
-    if (type->isVectorTy() && (!allow_vector || type->getPrimitiveSizeInBits() != desc.size)) {
-        DYNAUTIC_ASSERT(type->getPrimitiveSizeInBits() >= desc.size);
-        type = rinst.GetType(static_cast<uint8_t>(type->getPrimitiveSizeInBits()), allow_vector);
+    const auto type_size = GetTypeSizeInBits(rinst, type);
+    if (type->isVectorTy() && (!allow_vector || type_size != desc.size)) {
+        DYNAUTIC_ASSERT(type_size >= desc.size);
+        type = rinst.GetType(static_cast<uint8_t>(type_size), allow_vector);
         fres = rinst.builder->CreateBitCast(fres, type);
     }
     // Truncate as needed
@@ -173,14 +178,14 @@ Value *Lifter::StoreRegister(Instance& rinst, RegisterDescription desc, llvm::Va
         fres = rinst.builder->CreateIntCast(value, full_type, false, desc.GetName());
     } else {
         const auto full_size = desc.GetFullTypeSize();
-        DYNAUTIC_ASSERT(reg_type->getPrimitiveSizeInBits() == full_size);
+        DYNAUTIC_ASSERT(GetTypeSizeInBits(rinst, reg_type) == full_size);
         Type *value_type = value->getType();
         if (!value_type->isVectorTy()) {
             if (value_type->getIntegerBitWidth() != full_size)
                 value = rinst.builder->CreateIntCast(value, rinst.GetType(full_size), false);
             fres = rinst.builder->CreateBitCast(value, full_type);
         } else {
-            DYNAUTIC_ASSERT(value_type->getPrimitiveSizeInBits() == full_size);
+            DYNAUTIC_ASSERT(GetTypeSizeInBits(rinst, value_type) == full_size);
         }
     }
     return fres;

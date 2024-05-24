@@ -25,13 +25,15 @@ add_library(dynautic STATIC
     src/A64/runtime.hpp src/A64/runtime.cpp
     src/A64/cache.hpp src/A64/cache.cpp
     src/A64/lifter.hpp src/A64/lifter.cpp
-    src/A64/lifter_instance.hpp src/A64/lifter_instance.cpp
-    src/A64/lifter_instructions.hpp src/A64/lifter_instructions.cpp
-    src/A64/lifter_registers.cpp
-    src/A64/lifter_shifts.cpp
-    src/A64/lifter_glue_emitters.cpp
-    src/A64/lifter_conditions.cpp
-    src/A64/lifter_trampolines.cpp
+                       src/A64/lifter_instance.hpp src/A64/lifter_instance.cpp
+                       src/A64/lifter_instructions.hpp src/A64/lifter_instructions.cpp
+                                                       src/A64/lifter_instructions_macros.hpp
+                                                       src/A64/lifter_instructions_base.cpp
+                       src/A64/lifter_registers.cpp
+                       src/A64/lifter_shifts.cpp
+                       src/A64/lifter_glue_emitters.cpp
+                       src/A64/lifter_conditions.cpp
+                       src/A64/lifter_trampolines.cpp
 )
 target_include_directories(dynautic PRIVATE ${LLVM_INCLUDE_DIRS} PUBLIC include)
 target_compile_definitions(dynautic PRIVATE ${LLVM_DEFINITIONS})

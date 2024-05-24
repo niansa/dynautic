@@ -63,6 +63,8 @@ class Lifter::InstructionLifter {
 
     void DeferCompilation(bool repeat_instruction = false);
 
+    bool BaseInstructions(uint64_t id);
+
 public:
     InstructionLifter(Lifter& parent, Lifter::Instance& rinst, const cs_insn& insn, const std::vector<VAddr>& noexec_addrs = {})
           : p(parent), rinst(rinst), noexec_addrs(std::move(noexec_addrs)), insn(insn), detail(insn.detail->aarch64) {
