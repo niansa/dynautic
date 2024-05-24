@@ -196,8 +196,17 @@ bool Lifter::InstructionLifter::Run() {
     // Get instruction id
     const uint64_t id = insn.is_alias ? insn.alias_id : insn.id;
 
-    // Big switch table for all instructions we need to handle
-    if (!BaseInstructions(id)) {
+    // Find function that could handle this instruction
+    auto handlers = {&InstructionLifter::BaseInstructions};
+
+    bool handled = false;
+    for (const auto handler : handlers) {
+        if (std::bind(handler, this, std::placeholders::_1)(id)) {
+            handled = true;
+            break;
+        }
+    }
+    if (!handled) {
         const bool noexec = std::find(noexec_addrs.begin(), noexec_addrs.end(), insn.address) != noexec_addrs.end();
         p.CreateExceptionTrampoline(rinst, noexec?Exception::NoExecuteFault:Exception::UnallocatedEncoding);
     }
