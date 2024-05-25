@@ -125,6 +125,7 @@ public:
     TestDynautic() {
         user_config.callbacks = &env;
         user_config.check_halt_on_memory_access = false;
+        //user_config.llvm_opt_level = Dynautic::LLVMOptimizationLevel::O0;
         mmap(reinterpret_cast<void*>(exe_base), 1024*1024/*1 MB*/, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_FIXED_NOREPLACE, -1, 0);
     }
 
@@ -139,6 +140,7 @@ public:
             // Configure
             user_config.update_cache = !(user_config.use_cache = user_config.unsafe_optimizations = user_config.fully_static = !cache.empty());
             user_config.native_memory = run == 2;
+            //user_config.dump_assembly = user_config.native_memory;
 
             // Create runtime
             Dynautic::A64::Runtime cpu(user_config);
