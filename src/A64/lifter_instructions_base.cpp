@@ -272,13 +272,14 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
         Value *value = rinst.builder->CreateIntrinsic(type, intr, {p.GetRegisterView(rinst, ops[1]), p.GetRegisterView(rinst, ops[2])});
         p.StoreRegister(rinst, ops[0], value);
 #else
-        // Check if right side is zero
-        Value *is_valid = rinst.builder->CreateICmpNE(p.GetRegisterView(rinst, ops[2]), ConstantInt::get(type, 0), "IsValidDiv");
         // Get operands
         Value *left_value = p.GetRegisterView(rinst, ops[1]),
             *right_value = p.GetRegisterView(rinst, ops[2]);
         // Generate zero as result if right value is zero
         if (!p.rt.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreDivByZero)) {
+            // Check if right side is zero
+            Value *is_valid = rinst.builder->CreateICmpNE(p.GetRegisterView(rinst, ops[2]), ConstantInt::get(type, 0), "IsValidDiv");
+            // Update values to produce 0 if division by zero
             left_value = rinst.builder->CreateSelect(is_valid, left_value, ConstantInt::get(type, 0));
             right_value = rinst.builder->CreateSelect(is_valid, right_value, ConstantInt::get(type, 1));
         }
