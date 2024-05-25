@@ -52,6 +52,9 @@ void Lifter::LoadFunctionContext(Instance& rinst, bool new_allocas) {
         rt_allocas.nzcv = rinst.builder->CreateAlloca(rinst.GetIntType(8), nullptr, "alloca_nzcv_");
     CreateLoadFromGlobalIntoPtr(rinst, "nzcv", rinst.GetIntType(8), rt_allocas.nzcv);
 
+    // Allocate temp space
+    rt_allocas.temp = rinst.builder->CreateAlloca(rinst.GetIntType(64), nullptr, "temp");
+
     // Load branch context
     LoadBranchContext(rinst);
 }

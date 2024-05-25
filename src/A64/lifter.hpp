@@ -91,6 +91,8 @@ class Lifter {
         llvm::Value *nzcv;
         bool dirty_nzcv{};
         llvm::Value *exclusive_monitor{};
+
+        llvm::Value *temp;
     } rt_values, rt_allocas;
 
     void ResetScratchRegisters();

@@ -274,14 +274,21 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
 #else
         // Get operands
         Value *left_value = p.GetRegisterView(rinst, ops[1]),
-            *right_value = p.GetRegisterView(rinst, ops[2]);
-        // Generate zero as result if right value is zero
+              *right_value = p.GetRegisterView(rinst, ops[2]);
+        // Branching code to prevent division by zero
+        BasicBlock *division_branch;
+        BasicBlock *division_skip;
+        BasicBlock *division_continue;
         if (!p.rt.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreDivByZero)) {
             // Check if right side is zero
-            Value *is_valid = rinst.builder->CreateICmpNE(p.GetRegisterView(rinst, ops[2]), ConstantInt::get(type, 0), "IsValidDiv");
-            // Update values to produce 0 if division by zero
-            left_value = rinst.builder->CreateSelect(is_valid, left_value, ConstantInt::get(type, 0));
-            right_value = rinst.builder->CreateSelect(is_valid, right_value, ConstantInt::get(type, 1));
+            Value *is_valid = rinst.builder->CreateICmpNE(p.GetRegisterView(rinst, ops[2]), Constant::getNullValue(type), "IsValidDiv");
+            // Create basic blocks
+            division_branch = rinst.CreateBasicBlock("DivisionBranch");
+            division_skip = rinst.CreateBasicBlock("DivisionSkip");
+            division_continue = rinst.CreateBasicBlock("DivisionContinue");
+            // Branch accordingly
+            rinst.builder->CreateCondBr(is_valid, division_branch, division_skip);
+            rinst.UseBasicBlock(division_branch);
         }
         // Do division
         Value *value;
@@ -289,8 +296,19 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
         case AArch64_INS_SDIV: value = rinst.builder->CreateSDiv(left_value, right_value); break;
         case AArch64_INS_UDIV: value = rinst.builder->CreateUDiv(left_value, right_value); break;
         }
+        rinst.builder->CreateStore(value, p.rt_allocas.temp);
+        // Finalize branching code to prevent division by zero
+        if (!p.rt.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreDivByZero)) {
+            rinst.builder->CreateBr(division_continue);
+            // Create zero-setting code
+            rinst.UseBasicBlock(division_skip);
+            rinst.builder->CreateStore(Constant::getNullValue(type), p.rt_allocas.temp);
+            rinst.builder->CreateBr(division_continue);
+            // Continue as usual
+            rinst.UseBasicBlock(division_continue);
+        }
         // Store final result
-        p.StoreRegister(rinst, ops[0], value);
+        p.StoreRegister(rinst, ops[0], rinst.builder->CreateLoad(type, p.rt_allocas.temp));
 #endif
     } return true;
     case AArch64_INS_ALIAS_SXTB:
