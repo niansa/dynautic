@@ -211,9 +211,14 @@ Value *Lifter::StoreRegister(Instance& rinst, RegisterDescription desc, llvm::Va
     Value *&fres = GetRawRegister(desc, true);
     // Apply shift to value
     value = PerformShift(rinst, value, shift_type, shift);
-    // Extend as needed
+    // Bitcast as needed
     Type *reg_type = fres->getType();
     Type *current_type = value->getType();
+    if (current_type != reg_type) {
+        current_type = reg_type->getWithNewBitWidth(static_cast<unsigned>(GetTypeSizeInBits(rinst, current_type)));
+        value = rinst.builder->CreateBitCast(value, current_type);
+    }
+    // Extend as needed
     if (current_type != reg_type) {
         const auto current_type_size = GetTypeSizeInBits(rinst, current_type);
         const auto reg_type_size = GetTypeSizeInBits(rinst, reg_type);
@@ -224,9 +229,6 @@ Value *Lifter::StoreRegister(Instance& rinst, RegisterDescription desc, llvm::Va
             value = rinst.builder->CreateZExt(value, current_type);
         }
     }
-    // Bitcast as needed
-    if (current_type != reg_type)
-        value = rinst.builder->CreateBitCast(value, reg_type);
     // Set register
     fres = value;
 
