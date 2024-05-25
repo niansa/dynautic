@@ -280,8 +280,9 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
         BasicBlock *division_skip;
         BasicBlock *division_continue;
         if (!p.rt.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreDivByZero)) {
-            // Check if right side is zero
+            // Check if right side is zero (expect non-zero)
             Value *is_valid = rinst.builder->CreateICmpNE(p.GetRegisterView(rinst, ops[2]), Constant::getNullValue(type), "IsValidDiv");
+            is_valid = rinst.builder->CreateIntrinsic(rinst.builder->getInt1Ty(), Intrinsic::expect, {is_valid, rinst.builder->getInt1(true)});
             // Create basic blocks
             division_branch = rinst.CreateBasicBlock("DivisionBranch");
             division_skip = rinst.CreateBasicBlock("DivisionSkip");
