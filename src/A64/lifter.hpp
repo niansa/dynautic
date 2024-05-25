@@ -37,8 +37,8 @@ struct RegisterDescription {
     int idx;
 
     RegisterDescription() {}
-    RegisterDescription(const char *name);
-    RegisterDescription(csh handle, aarch64_reg reg);
+    RegisterDescription(const char *name, VectorLayout vas = AArch64Layout_Invalid);
+    RegisterDescription(csh handle, aarch64_reg reg, VectorLayout vas = AArch64Layout_Invalid);
     RegisterDescription(unsigned scratchIdx, bool isWord) : type(Type::scratch), size(isWord?Size::word:Size::double_word), idx(scratchIdx) {}
 
     bool operator==(RegisterDescription o) const {

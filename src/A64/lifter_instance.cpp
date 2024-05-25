@@ -71,6 +71,13 @@ Type *Lifter::Instance::GetIntVectorType(uint8_t bits, uint8_t elements) {
     return FixedVectorType::get(GetIntType(bits), elements);
 }
 
+Type *Lifter::Instance::GetRegType(const RegisterDescription& desc) {
+    if (desc.type != RegisterDescription::Type::vector)
+        return GetIntType(desc.size);
+    else
+        return GetIntVectorType(desc.size, desc.elements);
+}
+
 ConstantInt *Lifter::Instance::CreateInt(uint8_t bits, uint64_t value) {
     return ConstantInt::get(reinterpret_cast<IntegerType*>(GetIntType(bits)), value);
 }

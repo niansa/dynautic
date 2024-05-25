@@ -60,7 +60,7 @@ std::array<RegisterDescription, Lifter::InstructionLifter::GetOps_max_op_count> 
         switch(op.type) {
         case AArch64_OP_REG: {
             // Get register
-            regs[op_idx] = {p.cs_handle, op.reg};
+            regs[op_idx] = {p.cs_handle, op.reg, op.vas};
         } break;
         case AArch64_OP_IMM: {
             // Load from immediate
@@ -68,6 +68,7 @@ std::array<RegisterDescription, Lifter::InstructionLifter::GetOps_max_op_count> 
         } break;
         case AArch64_OP_MEM_REG: {
             // Add up references
+            DYNAUTIC_ASSERT(op.vas == AArch64Layout_VectorLayout::AArch64Layout_Invalid);
             Value *reference = rinst.builder->CreateAdd(p.GetRegisterView(rinst, {p.cs_handle, op.mem.base}), p.GetRegisterView(rinst, {p.cs_handle, op.mem.index}));
             reference = rinst.builder->CreateAdd(reference, rinst.CreateInt(32, op.mem.disp));
             // Load value from reference

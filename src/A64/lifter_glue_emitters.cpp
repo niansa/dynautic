@@ -110,7 +110,7 @@ void Lifter::LoadBranchContext(Instance& rinst) {
 
     // Fill in vector registers
     for (unsigned idx = 0; idx != rt_values.vectors.size(); ++idx)
-        rt_values.vectors[idx] = rinst.builder->CreateLoad(rinst.GetIntVectorType(64, 2), rt_allocas.vectors[idx], "q"+std::to_string(idx)+'_');
+        rt_values.vectors[idx] = rinst.builder->CreateLoad(rinst.GetIntType(128), rt_allocas.vectors[idx], "q"+std::to_string(idx)+'_');
 
     // Fill in comparisation
     rt_values.comparison.first = rinst.builder->CreateLoad(rinst.GetIntType(64), rt_allocas.comparison.first, "comp_first_");

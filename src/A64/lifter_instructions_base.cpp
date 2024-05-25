@@ -136,13 +136,13 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
     case AArch64_INS_ALIAS_ANDS:
     case AArch64_INS_ANDS: {
         const auto ops = GetOps(3);
-        Value *result = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[1]), p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2], rinst.GetIntType(ops[1].size)), shift_type, shift));
+        Value *result = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[1]), p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2], rinst.GetRegType(ops[1])), shift_type, shift));
         p.StoreRegister(rinst, ops[0], result);
         SetNZFromInt(result);
     } return true;
     case AArch64_INS_ALIAS_TST: {
         const auto ops = GetOps(2);
-        Value *result = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[0]), p.PerformShift(rinst, p.GetRegisterView(rinst, ops[1], rinst.GetIntType(ops[0].size)), shift_type, shift));
+        Value *result = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[0]), p.PerformShift(rinst, p.GetRegisterView(rinst, ops[1], rinst.GetRegType(ops[0])), shift_type, shift));
         SetNZFromInt(result);
     } return true;
     case AArch64_INS_ALIAS_BIC:
@@ -152,7 +152,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
     case AArch64_INS_ALIAS_BICS:
     case AArch64_INS_BICS: {
         const auto ops = GetOps(3);
-        Value *result = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateNot(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2], rinst.GetIntType(ops[1].size)), shift_type, shift)));
+        Value *result = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateNot(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2], rinst.GetRegType(ops[1])), shift_type, shift)));
         p.StoreRegister(rinst, ops[0], result);
         SetNZFromInt(result);
     } return true;
@@ -195,7 +195,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
     } return true;
     case AArch64_INS_ABS: {
         const auto ops = GetOps(2);
-        Type *type = rinst.GetIntType(ops[1].size);
+        Type *type = rinst.GetRegType(ops[1]);
         Value *value = p.GetRegisterView(rinst, ops[1]);
         // Could use llvm.abs.*(*, false) instead
         p.StoreRegister(rinst, ops[0], rinst.builder->CreateAdd(rinst.builder->CreateNot(value), ConstantInt::get(type, 1)));
@@ -215,7 +215,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
     case AArch64_INS_SUBS: {
         const auto ops = GetOps(3);
         Value *left = p.GetRegisterView(rinst, ops[1]);
-        Value *right = p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2], rinst.GetIntType(ops[1].size)), shift_type, shift);
+        Value *right = p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2], rinst.GetRegType(ops[1])), shift_type, shift);
         SetComparison(left, right);
         p.StoreRegister(rinst, ops[0], rinst.builder->CreateSub(left, right));
     } [[fallthrough]];
@@ -261,7 +261,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
     case AArch64_INS_SDIV:
     case AArch64_INS_UDIV: {
         const auto ops = GetOps(3);
-        Type *type = rinst.GetIntType(ops[0].size);
+        Type *type = rinst.GetRegType(ops[0]);
 #ifdef __aarch64__
         // Handle division on arm64 natively
         Intrinsic::ID intr;
@@ -379,7 +379,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
 
         Value *value = p.CreateMemoryLoad(rinst, reference, rinst.GetIntType(msiz?msiz:op.size));
         if (msiz)
-            value = rinst.builder->CreateIntCast(value, rinst.GetIntType(op.size), extra_flags[signed_]);
+            value = rinst.builder->CreateIntCast(value, rinst.GetRegType(op), extra_flags[signed_]);
         p.StoreRegister(rinst, op, value);
     } return true;
     case AArch64_INS_ALIAS_STURB:
@@ -406,7 +406,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
     case AArch64_INS_ALIAS_LDPSW:
     case AArch64_INS_LDPSW: {
         const auto ops = GetOps(2);
-        Type *type = rinst.GetIntType(ops[0].size);
+        Type *type = rinst.GetRegType(ops[0]);
         Value *reference = GetMemOpReference(false, 2);
         p.StoreRegister(rinst, ops[0], rinst.builder->CreateIntCast(p.CreateMemoryLoad(rinst, reference, rinst.GetIntType(32)), type, true));
         reference = rinst.builder->CreateAdd(reference, rinst.CreateInt(64, ops[0].size/8));
@@ -416,13 +416,13 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
     case AArch64_INS_ALIAS_LDP:
     case AArch64_INS_LDP: {
         const auto ops = GetOps(2);
-        Type *type = rinst.GetIntType(ops[0].size);
+        Type *type = rinst.GetRegType(ops[0]);
         Value *reference = GetMemOpReference(false, 2);
 
         if (extra_flags[exclusive] && !p.rt.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)) {
 #ifdef __aarch64__
             if (p.rt.conf.native_memory) {
-                Type *type = rinst.GetIntType(ops[0].size);
+                Type *type = rinst.GetRegType(ops[0].size);
                 reference = rinst.builder->CreateIntToPtr(reference, rinst.builder->getPtrTy());
                 CallInst *result = rinst.builder->CreateIntrinsic(type, Intrinsic::aarch64_ldxp, {reference});
                 result->addParamAttr(0, Attribute::get(*rinst.context, Attribute::ElementType, type));
@@ -507,7 +507,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
             value = rinst.builder->CreateExtractValue(value, 0);
             p.StoreRegister(rinst, ops[0], value);
         } else {
-            Type *type = rinst.GetIntType(ops[0].size);
+            Type *type = rinst.GetRegType(ops[0]);
             BasicBlock *loop;
             if (!p.rt.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)) {
                 // Create basic block for retry loop
@@ -603,7 +603,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
                 case AArch64_INS_STXP: intr = Intrinsic::aarch64_stxp; break;
                 }
                 CallInst *result = rinst.builder->CreateIntrinsic(rinst.GetIntType(32), intr, {p.GetRegisterView(rinst, ops[1]), p.GetRegisterView(rinst, ops[2]), reference});
-                result->addParamAttr(2, Attribute::get(*rinst.context, Attribute::ElementType, rinst.GetIntType(ops[1].size)));
+                result->addParamAttr(2, Attribute::get(*rinst.context, Attribute::ElementType, rinst.GetRegType(ops[1].size)));
                 p.StoreRegister(rinst, ops[0], result);
             } else {
 #endif
@@ -674,9 +674,9 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
         const auto ops = GetOps(2);
         p.FinalizeBranchContext(rinst);
         const VAddr false_addr = insn.address+4;
-        Value *value = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[0]), rinst.builder->CreateShl(ConstantInt::get(rinst.GetIntType(ops[0].size), 1), p.GetRegisterView(rinst, ops[1])));
+        Value *value = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[0]), rinst.builder->CreateShl(ConstantInt::get(rinst.GetRegType(ops[0]), 1), p.GetRegisterView(rinst, ops[1])));
         const auto pred = extra_flags[0]?ICmpInst::ICMP_NE:ICmpInst::ICMP_EQ;
-        Value *cond = rinst.builder->CreateICmp(pred, value, ConstantInt::get(rinst.GetIntType(ops[0].size), 0));
+        Value *cond = rinst.builder->CreateICmp(pred, value, ConstantInt::get(rinst.GetRegType(ops[0]), 0));
         std::pair<BasicBlock *, BasicBlock *> branches = {PrepareBranch(2), p.PrepareBranch(rinst, false_addr)};
         p.CreateConditionalBranch(rinst, branches.first, branches.second, cond);
     } return true;

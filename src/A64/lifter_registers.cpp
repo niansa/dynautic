@@ -8,7 +8,7 @@ using namespace llvm::orc;
 
 
 namespace Dynautic::A64 {
-RegisterDescription::RegisterDescription(const char *name) {
+RegisterDescription::RegisterDescription(const char *name, VectorLayout vas) {
     if (std::string_view(name) == "sp") {
         type = Type::stack_pointer;
         idx = 0;
@@ -22,7 +22,6 @@ RegisterDescription::RegisterDescription(const char *name) {
     case 's': size = Size::single; type = Type::scalar; break;
     case 'd': size = Size::double_; type = Type::scalar; break;
     case 'q': size = Size::quad; type = Type::scalar; break;
-    case 'v': type = Type::vector; break;
     }
 
     switch (type) {
@@ -38,32 +37,37 @@ RegisterDescription::RegisterDescription(const char *name) {
         // Convert to integer
         idx = static_cast<int>(std::stoul(name));
     } break;
-    case Type::vector: {
-        // Remove letter
-        ++name;
-        // Convert to integer
-        idx = static_cast<int>(std::stoul(name));
-        // Skip past .
-        while (*(name++) != '.');
-        // Convert to integer
-        elements = static_cast<uint8_t>(std::stoul(name));
-        // Skip past number
-        while (std::isdigit(*(name++)));
-        // Determine size
-        switch (name[0]) {
-        case 'b': size = Size::byte; break;
-        case 'h': size = Size::half; break;
-        case 's': size = Size::single; break;
-        case 'd': size = Size::double_; break;
-        case 'q': size = Size::quad; break;
-        }
-    }
     default: DYNAUTIC_ASSERT(!"Unsupported register type");
+    }
+
+    if (vas != AArch64Layout_Invalid) {
+        DYNAUTIC_ASSERT(type == Type::scalar);
+        type = Type::vector;
+
+        switch (vas) {
+        case AArch64Layout_VL_4B: size = Size::byte; elements = 4; break;
+        case AArch64Layout_VL_2H: size = Size::half; elements = 2; break;
+        case AArch64Layout_VL_1S: size = Size::single; elements = 1; break;
+        case AArch64Layout_VL_8B: size = Size::byte; elements = 8; break;
+        case AArch64Layout_VL_4H: size = Size::half; elements = 4; break;
+        case AArch64Layout_VL_2S: size = Size::single; elements = 2; break;
+        case AArch64Layout_VL_1D: size = Size::double_; elements = 1; break;
+        case AArch64Layout_VL_16B: size = Size::byte; elements = 16; break;
+        case AArch64Layout_VL_8H: size = Size::half; elements = 8; break;
+        case AArch64Layout_VL_4S: size = Size::single; elements = 4; break;
+        case AArch64Layout_VL_2D: size = Size::double_; elements = 2; break;
+        case AArch64Layout_VL_1Q: size = Size::quad; elements = 1; break;
+        case AArch64Layout_VL_64B: size = Size::byte; elements = 64; break;
+        case AArch64Layout_VL_32H: size = Size::half; elements = 32; break;
+        case AArch64Layout_VL_16S: size = Size::single; elements = 16; break;
+        case AArch64Layout_VL_8D: size = Size::double_; elements = 8; break;
+        default: DYNAUTIC_ASSERT(!"Incomplete vector layout");
+        }
     }
 }
 
-RegisterDescription::RegisterDescription(csh handle, aarch64_reg reg)
-    : RegisterDescription(reg==AArch64_REG_INVALID?"xzr":cs_reg_name(handle, reg)) {}
+RegisterDescription::RegisterDescription(csh handle, aarch64_reg reg, VectorLayout vas)
+    : RegisterDescription(reg==AArch64_REG_INVALID?"xzr":cs_reg_name(handle, reg), vas) {}
 
 std::string RegisterDescription::GetName() const {
     std::string fres;
@@ -171,10 +175,7 @@ Value *Lifter::GetRegisterView(Instance& rinst, RegisterDescription desc, Type *
         DYNAUTIC_ASSERT(current_type_size >= requested_type_size);
 
         if (requested_type_size < current_type_size) {
-            auto new_width = static_cast<unsigned>(requested_type_size);
-            if (current_type->isVectorTy() && !as_type->isVectorTy())
-                new_width /= (current_type_size / current_type->getScalarSizeInBits());
-            current_type = current_type->getWithNewBitWidth(new_width);
+            current_type = current_type->getWithNewBitWidth(static_cast<unsigned>(requested_type_size));
             fres = rinst.builder->CreateTrunc(fres, current_type);
         }
     }
@@ -219,10 +220,7 @@ Value *Lifter::StoreRegister(Instance& rinst, RegisterDescription desc, llvm::Va
         DYNAUTIC_ASSERT(reg_type_size >= current_type_size);
 
         if (reg_type_size > current_type_size) {
-            auto new_width = static_cast<unsigned>(reg_type_size);
-            if (current_type->isVectorTy() && !reg_type->isVectorTy())
-                new_width *= (reg_type_size / reg_type->getScalarSizeInBits());
-            current_type = current_type->getWithNewBitWidth(new_width);
+            current_type = current_type->getWithNewBitWidth(static_cast<unsigned>(reg_type_size));
             value = rinst.builder->CreateZExt(value, current_type);
         }
     }

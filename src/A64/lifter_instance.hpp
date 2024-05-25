@@ -84,6 +84,7 @@ public:
 
     llvm::Type *GetIntType(uint8_t bits);
     llvm::Type *GetIntVectorType(uint8_t bits, uint8_t elements);
+    llvm::Type *GetRegType(const RegisterDescription& desc);
     llvm::ConstantInt *CreateInt(uint8_t bits, uint64_t value);
 };
 }
