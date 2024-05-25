@@ -19,14 +19,15 @@ RegisterDescription::RegisterDescription(const char *name) {
     case 'w': size = Size::word; type = Type::general; break;
     case 'r': [[fallthrough]];
     case 'x': size = Size::double_word; type = Type::general; break;
-    case 's': size = Size::single; type = Type::vector; break;
-    case 'd': size = Size::double_; type = Type::vector; break;
-    case 'q': size = Size::quad; type = Type::vector; break;
+    case 's': size = Size::single; type = Type::scalar; break;
+    case 'd': size = Size::double_; type = Type::scalar; break;
+    case 'q': size = Size::quad; type = Type::scalar; break;
+    case 'v': type = Type::vector; break;
     }
 
     switch (type) {
     case Type::general:
-    case Type::vector: {
+    case Type::scalar: {
         // Remove letter
         ++name;
         // Check for zr
@@ -37,6 +38,26 @@ RegisterDescription::RegisterDescription(const char *name) {
         // Convert to integer
         idx = static_cast<int>(std::stoul(name));
     } break;
+    case Type::vector: {
+        // Remove letter
+        ++name;
+        // Convert to integer
+        idx = static_cast<int>(std::stoul(name));
+        // Skip past .
+        while (*(name++) != '.');
+        // Convert to integer
+        elements = static_cast<uint8_t>(std::stoul(name));
+        // Skip past number
+        while (std::isdigit(*(name++)));
+        // Determine size
+        switch (name[0]) {
+        case 'b': size = Size::byte; break;
+        case 'h': size = Size::half; break;
+        case 's': size = Size::single; break;
+        case 'd': size = Size::double_; break;
+        case 'q': size = Size::quad; break;
+        }
+    }
     default: DYNAUTIC_ASSERT(!"Unsupported register type");
     }
 }
@@ -55,7 +76,7 @@ std::string RegisterDescription::GetName() const {
         case double_word: fres.push_back('x'); break;
         }
     } break;
-    case Type::vector: {
+    case Type::scalar: {
         switch (size) {
         case single: fres.push_back('s'); break;
         case double_: fres.push_back('d'); break;
@@ -107,7 +128,7 @@ Value *&Lifter::GetRawRegister(RegisterDescription desc, bool allow_overwrite) {
             rt_values.dirty_registers[desc.idx] = true;
         return rt_values.registers[desc.idx];
     } break;
-    case RegisterDescription::Type::vector: {
+    case RegisterDescription::Type::scalar: {
         if (allow_overwrite)
             rt_values.dirty_vectors[desc.idx] = true;
         return rt_values.vectors[desc.idx];

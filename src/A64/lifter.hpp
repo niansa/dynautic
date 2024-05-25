@@ -16,11 +16,14 @@ struct RegisterDescription {
         invalid,
         scratch,
         general,
+        scalar,
         vector,
         stack_pointer
     } type = Type::invalid;
 
     enum Size : uint8_t {
+        byte = 8,
+        half = 16,
         single = 32,
         word = 32,
         double_ = 64,
@@ -28,6 +31,8 @@ struct RegisterDescription {
         quad = 128
     };
     uint8_t size = Size::double_word;
+
+    uint8_t elements = 0;
 
     int idx;
 
@@ -47,7 +52,7 @@ struct RegisterDescription {
         switch (type) {
         case Type::scratch: return 128;
         case Type::general: return 64;
-        case Type::vector: return 128;
+        case Type::scalar: return 128;
         case Type::stack_pointer: return 64;
         default: {
             DYNAUTIC_ASSERT(!"Invalid register type");
