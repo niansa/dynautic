@@ -128,6 +128,7 @@ Value *&Lifter::GetRawRegister(RegisterDescription desc, bool allow_overwrite) {
             rt_values.dirty_registers[desc.idx] = true;
         return rt_values.registers[desc.idx];
     } break;
+    case RegisterDescription::Type::vector:
     case RegisterDescription::Type::scalar: {
         if (allow_overwrite)
             rt_values.dirty_vectors[desc.idx] = true;
@@ -159,7 +160,7 @@ Value *Lifter::GetRegisterView(Instance& rinst, RegisterDescription desc, Type *
 
     // Handle zero register
     if (desc.IsZero())
-        return ConstantInt::get(rinst.GetType(desc.size), 0);
+        return ConstantInt::get(rinst.GetIntType(desc.size), 0);
     // Get real register from list
     Value *fres = GetRawRegister(desc, false);
     // Truncate as needed
@@ -184,8 +185,13 @@ Value *Lifter::GetRegisterView(Instance& rinst, RegisterDescription desc, Type *
     return fres;
 }
 
-Value *Lifter::GetRegisterView(Instance& rinst, RegisterDescription desc, bool allow_vector) {
-    return GetRegisterView(rinst, desc, rinst.GetType(desc.size, allow_vector));
+Value *Lifter::GetRegisterView(Instance& rinst, RegisterDescription desc) {
+    Type *type;
+    if (desc.type != RegisterDescription::Type::vector)
+        type = rinst.GetIntType(desc.size);
+    else
+        type = rinst.GetIntVectorType(desc.size, desc.elements);
+    return GetRegisterView(rinst, desc, type);
 }
 
 Value *Lifter::StoreRegister(Instance& rinst, RegisterDescription desc, llvm::Value *value, aarch64_shifter shift_type, uint8_t shift) {
@@ -199,7 +205,7 @@ Value *Lifter::StoreRegister(Instance& rinst, RegisterDescription desc, llvm::Va
 
     // Handle zero register
     if (desc.IsZero())
-        return ConstantInt::get(rinst.GetType(desc.size), 0);
+        return ConstantInt::get(rinst.GetIntType(desc.size), 0);
     // Get real register from list
     Value *&fres = GetRawRegister(desc, true);
     // Apply shift to value
@@ -234,7 +240,7 @@ Value *Lifter::StoreRegister16(Instance& rinst, RegisterDescription desc, uint16
 
     // Handle zero register
     if (desc.IsZero())
-        return ConstantInt::get(rinst.GetType(desc.size), 0);
+        return ConstantInt::get(rinst.GetIntType(desc.size), 0);
     // Get real register from list
     Value *&fres = GetRawRegister(desc, true);
     if (keep) {

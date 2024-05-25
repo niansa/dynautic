@@ -53,26 +53,25 @@ BasicBlock *Lifter::Instance::QueueDynamicBranch(VAddr *&addr, VAddr origin, con
     return queued_branches.emplace(branches.emplace_back(std::move(branch)).get())->basic_block;
 }
 
-Type *Lifter::Instance::GetType(uint8_t bits, bool allow_vector) {
+Type *Lifter::Instance::GetIntType(uint8_t bits) {
     switch (bits) {
     case 1: return builder->getInt1Ty();
     case 8: return builder->getInt8Ty();
     case 16: return builder->getInt16Ty();
     case 32: return builder->getInt32Ty();
     case 64: return builder->getInt64Ty();
-    case 128: {
-        if (allow_vector)
-            return FixedVectorType::get(builder->getInt64Ty(), 2);
-        else
-            return builder->getInt128Ty();
-    }
+    case 128: return builder->getInt128Ty();
     }
 
     DYNAUTIC_ASSERT(!"Invalid bit count");
     return nullptr;
 }
 
+Type *Lifter::Instance::GetIntVectorType(uint8_t bits, uint8_t elements) {
+    return FixedVectorType::get(GetIntType(bits), elements);
+}
+
 ConstantInt *Lifter::Instance::CreateInt(uint8_t bits, uint64_t value) {
-    return ConstantInt::get(reinterpret_cast<IntegerType*>(GetType(bits, false)), value);
+    return ConstantInt::get(reinterpret_cast<IntegerType*>(GetIntType(bits)), value);
 }
 }

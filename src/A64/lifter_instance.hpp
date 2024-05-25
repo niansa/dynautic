@@ -82,7 +82,8 @@ public:
         return &branch->addr;
     }
 
-    llvm::Type *GetType(uint8_t bits, bool allow_vector = false);
+    llvm::Type *GetIntType(uint8_t bits);
+    llvm::Type *GetIntVectorType(uint8_t bits, uint8_t elements);
     llvm::ConstantInt *CreateInt(uint8_t bits, uint64_t value);
 };
 }

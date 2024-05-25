@@ -73,7 +73,7 @@ std::array<RegisterDescription, Lifter::InstructionLifter::GetOps_max_op_count> 
             // Load value from reference
             DYNAUTIC_ASSERT(op_idx != 0);
             auto value_reg = p.AllocateScratchRegister(regs[0].size == RegisterDescription::word);
-            p.GetRawRegister(value_reg, true) = rinst.builder->CreateLoad(rinst.GetType(value_reg.size), reference);
+            p.GetRawRegister(value_reg, true) = rinst.builder->CreateLoad(rinst.GetIntType(value_reg.size), reference);
             regs[op_idx] = value_reg;
         } break;
         case AArch64_OP_INVALID: {

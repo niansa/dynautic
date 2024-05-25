@@ -132,7 +132,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
                     right_imm16 = ~right_imm16;
                 p.StoreRegister16(rinst, left, right_imm16, extra_flags[0], shift_type, shift);
             } else {
-                p.StoreRegister(rinst, left, ConstantInt::get(rinst.GetType(left.size), right_imm), shift_type, shift);
+                p.StoreRegister(rinst, left, ConstantInt::get(rinst.GetIntType(left.size), right_imm), shift_type, shift);
             }
         }
     } return true;
@@ -143,13 +143,13 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
     case AArch64_INS_ALIAS_ANDS:
     case AArch64_INS_ANDS: {
         const auto ops = GetOps(3);
-        Value *result = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[1]), p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2], rinst.GetType(ops[1].size)), shift_type, shift));
+        Value *result = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[1]), p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2], rinst.GetIntType(ops[1].size)), shift_type, shift));
         p.StoreRegister(rinst, ops[0], result);
         SetNZFromInt(result);
     } return true;
     case AArch64_INS_ALIAS_TST: {
         const auto ops = GetOps(2);
-        Value *result = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[0]), p.PerformShift(rinst, p.GetRegisterView(rinst, ops[1], rinst.GetType(ops[0].size)), shift_type, shift));
+        Value *result = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[0]), p.PerformShift(rinst, p.GetRegisterView(rinst, ops[1], rinst.GetIntType(ops[0].size)), shift_type, shift));
         SetNZFromInt(result);
     } return true;
     case AArch64_INS_ALIAS_BIC:
@@ -159,7 +159,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
     case AArch64_INS_ALIAS_BICS:
     case AArch64_INS_BICS: {
         const auto ops = GetOps(3);
-        Value *result = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateNot(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2], rinst.GetType(ops[1].size)), shift_type, shift)));
+        Value *result = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[1]), rinst.builder->CreateNot(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2], rinst.GetIntType(ops[1].size)), shift_type, shift)));
         p.StoreRegister(rinst, ops[0], result);
         SetNZFromInt(result);
     } return true;
@@ -202,7 +202,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
     } return true;
     case AArch64_INS_ABS: {
         const auto ops = GetOps(2);
-        Type *type = rinst.GetType(ops[1].size);
+        Type *type = rinst.GetIntType(ops[1].size);
         Value *value = p.GetRegisterView(rinst, ops[1]);
         // Could use llvm.abs.*(*, false) instead
         p.StoreRegister(rinst, ops[0], rinst.builder->CreateAdd(rinst.builder->CreateNot(value), ConstantInt::get(type, 1)));
@@ -222,7 +222,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
     case AArch64_INS_SUBS: {
         const auto ops = GetOps(3);
         Value *left = p.GetRegisterView(rinst, ops[1]);
-        Value *right = p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2], rinst.GetType(ops[1].size)), shift_type, shift);
+        Value *right = p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2], rinst.GetIntType(ops[1].size)), shift_type, shift);
         SetComparison(left, right);
         p.StoreRegister(rinst, ops[0], rinst.builder->CreateSub(left, right));
     } [[fallthrough]];
@@ -247,7 +247,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
     case AArch64_INS_ALIAS_UMULL:
     case AArch64_INS_UMULL: {
         auto ops = GetOps(3);
-        Type *type = rinst.GetType(64);
+        Type *type = rinst.GetIntType(64);
         Value *value = rinst.builder->CreateMul(
             rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[1]), type, false),
             rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[2]), type, false));
@@ -259,16 +259,16 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
     } return true;
     case AArch64_INS_UMULH: {
         const auto ops = GetOps(3);
-        Value *left = rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[1]), rinst.GetType(128), false);
-        Value *right = rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift), rinst.GetType(128), false);
+        Value *left = rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[1]), rinst.GetIntType(128), false);
+        Value *right = rinst.builder->CreateIntCast(p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2]), shift_type, shift), rinst.GetIntType(128), false);
         Value *result = rinst.builder->CreateMul(left, right);
         result = rinst.builder->CreateLShr(result, 64);
-        p.StoreRegister(rinst, ops[0], rinst.builder->CreateIntCast(result, rinst.GetType(64), false));
+        p.StoreRegister(rinst, ops[0], rinst.builder->CreateIntCast(result, rinst.GetIntType(64), false));
     } return true;
     case AArch64_INS_SDIV:
     case AArch64_INS_UDIV: {
         const auto ops = GetOps(3);
-        Type *type = rinst.GetType(ops[0].size);
+        Type *type = rinst.GetIntType(ops[0].size);
 #ifdef __aarch64__
         // Handle division on arm64 natively
         Intrinsic::ID intr;
@@ -308,15 +308,15 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
             const auto ops = GetOps(2);
             Type *source = nullptr;
             if (extra_flags[byte])
-                source = rinst.GetType(8);
+                source = rinst.GetIntType(8);
             else if (extra_flags[half_word])
-                source = rinst.GetType(16);
+                source = rinst.GetIntType(16);
             else if (extra_flags[word])
-                source = rinst.GetType(32);
+                source = rinst.GetIntType(32);
             else
                 DYNAUTIC_ASSERT(!"Invalid source width in sign extend");
             Value *right_value = p.GetRegisterView(rinst, ops[1], source);
-            p.StoreRegister(rinst, ops[0], rinst.builder->CreateIntCast(right_value, rinst.GetType(64), true));
+            p.StoreRegister(rinst, ops[0], rinst.builder->CreateIntCast(right_value, rinst.GetIntType(64), true));
         } return true;
     case AArch64_INS_ALIAS_CMN: extra_flags[0] = true; [[fallthrough]];
     case AArch64_INS_ALIAS_CMP: {
@@ -371,8 +371,8 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
 #ifdef __aarch64__
             if (p.rt.conf.native_memory) {
                 reference = rinst.builder->CreateIntToPtr(reference, rinst.builder->getPtrTy());
-                CallInst *result = rinst.builder->CreateIntrinsic(rinst.GetType(64), Intrinsic::aarch64_ldxr, {reference});
-                result->addParamAttr(0, Attribute::get(*rinst.context, Attribute::ElementType, rinst.GetType(msiz?msiz:op.size)));
+                CallInst *result = rinst.builder->CreateIntrinsic(rinst.GetIntType(64), Intrinsic::aarch64_ldxr, {reference});
+                result->addParamAttr(0, Attribute::get(*rinst.context, Attribute::ElementType, rinst.GetIntType(msiz?msiz:op.size)));
                 p.StoreRegister(rinst, op, result);
                 return true;
             } else {
@@ -384,9 +384,9 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
 #endif
         }
 
-        Value *value = p.CreateMemoryLoad(rinst, reference, rinst.GetType(msiz?msiz:op.size));
+        Value *value = p.CreateMemoryLoad(rinst, reference, rinst.GetIntType(msiz?msiz:op.size));
         if (msiz)
-            value = rinst.builder->CreateIntCast(value, rinst.GetType(op.size), extra_flags[signed_]);
+            value = rinst.builder->CreateIntCast(value, rinst.GetIntType(op.size), extra_flags[signed_]);
         p.StoreRegister(rinst, op, value);
     } return true;
     case AArch64_INS_ALIAS_STURB:
@@ -407,29 +407,29 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
         Value *reference = GetMemOpReference(extra_flags[0]);
         Value *value = p.GetRegisterView(rinst, op);
         if (msiz)
-            value = rinst.builder->CreateIntCast(value, rinst.GetType(msiz), extra_flags[signed_]);
+            value = rinst.builder->CreateIntCast(value, rinst.GetIntType(msiz), extra_flags[signed_]);
         p.CreateMemoryStore(rinst, reference, value);
     } return true;
     case AArch64_INS_ALIAS_LDPSW:
     case AArch64_INS_LDPSW: {
         const auto ops = GetOps(2);
-        Type *type = rinst.GetType(ops[0].size);
+        Type *type = rinst.GetIntType(ops[0].size);
         Value *reference = GetMemOpReference(false, 2);
-        p.StoreRegister(rinst, ops[0], rinst.builder->CreateIntCast(p.CreateMemoryLoad(rinst, reference, rinst.GetType(32)), type, true));
+        p.StoreRegister(rinst, ops[0], rinst.builder->CreateIntCast(p.CreateMemoryLoad(rinst, reference, rinst.GetIntType(32)), type, true));
         reference = rinst.builder->CreateAdd(reference, rinst.CreateInt(64, ops[0].size/8));
-        p.StoreRegister(rinst, ops[1], rinst.builder->CreateIntCast(p.CreateMemoryLoad(rinst, reference, rinst.GetType(32)), type, true));
+        p.StoreRegister(rinst, ops[1], rinst.builder->CreateIntCast(p.CreateMemoryLoad(rinst, reference, rinst.GetIntType(32)), type, true));
     } return true;
     case AArch64_INS_LDXP: extra_flags[exclusive] = true; [[fallthrough]];
     case AArch64_INS_ALIAS_LDP:
     case AArch64_INS_LDP: {
         const auto ops = GetOps(2);
-        Type *type = rinst.GetType(ops[0].size);
+        Type *type = rinst.GetIntType(ops[0].size);
         Value *reference = GetMemOpReference(false, 2);
 
         if (extra_flags[exclusive] && !p.rt.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)) {
 #ifdef __aarch64__
             if (p.rt.conf.native_memory) {
-                Type *type = rinst.GetType(ops[0].size);
+                Type *type = rinst.GetIntType(ops[0].size);
                 reference = rinst.builder->CreateIntToPtr(reference, rinst.builder->getPtrTy());
                 CallInst *result = rinst.builder->CreateIntrinsic(type, Intrinsic::aarch64_ldxp, {reference});
                 result->addParamAttr(0, Attribute::get(*rinst.context, Attribute::ElementType, type));
@@ -514,7 +514,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
             value = rinst.builder->CreateExtractValue(value, 0);
             p.StoreRegister(rinst, ops[0], value);
         } else {
-            Type *type = rinst.GetType(ops[0].size);
+            Type *type = rinst.GetIntType(ops[0].size);
             BasicBlock *loop;
             if (!p.rt.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)) {
                 // Create basic block for retry loop
@@ -562,15 +562,15 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
         Value *value = p.GetRegisterView(rinst, ops[1]);
 
         if (msiz)
-            value = rinst.builder->CreateIntCast(value, rinst.GetType(msiz), extra_flags[signed_]);
+            value = rinst.builder->CreateIntCast(value, rinst.GetIntType(msiz), extra_flags[signed_]);
 
         if (!p.rt.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)) {
 #ifdef __aarch64__
             if (p.rt.conf.native_memory) {
                 reference = rinst.builder->CreateIntToPtr(reference, rinst.builder->getPtrTy());
-                Value *value = rinst.builder->CreateZExt(p.GetRegisterView(rinst, ops[1]), rinst.GetType(64));
+                Value *value = rinst.builder->CreateZExt(p.GetRegisterView(rinst, ops[1]), rinst.GetIntType(64));
                 CallInst *result = rinst.builder->CreateIntrinsic(Intrinsic::aarch64_stxr, {rinst.builder->getPtrTy()}, {value, reference});
-                result->addParamAttr(1, Attribute::get(*rinst.context, Attribute::ElementType, rinst.GetType(msiz?msiz:ops[1].size)));
+                result->addParamAttr(1, Attribute::get(*rinst.context, Attribute::ElementType, rinst.GetIntType(msiz?msiz:ops[1].size)));
                 p.StoreRegister(rinst, ops[0], result);
             } else {
 #endif
@@ -609,8 +609,8 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
                 case AArch64_INS_STLXP: intr = Intrinsic::aarch64_stlxp; break;
                 case AArch64_INS_STXP: intr = Intrinsic::aarch64_stxp; break;
                 }
-                CallInst *result = rinst.builder->CreateIntrinsic(rinst.GetType(32), intr, {p.GetRegisterView(rinst, ops[1]), p.GetRegisterView(rinst, ops[2]), reference});
-                result->addParamAttr(2, Attribute::get(*rinst.context, Attribute::ElementType, rinst.GetType(ops[1].size)));
+                CallInst *result = rinst.builder->CreateIntrinsic(rinst.GetIntType(32), intr, {p.GetRegisterView(rinst, ops[1]), p.GetRegisterView(rinst, ops[2]), reference});
+                result->addParamAttr(2, Attribute::get(*rinst.context, Attribute::ElementType, rinst.GetIntType(ops[1].size)));
                 p.StoreRegister(rinst, ops[0], result);
             } else {
 #endif
@@ -673,7 +673,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
         p.FinalizeBranchContext(rinst);
         const VAddr false_addr = insn.address+4;
         const auto pred = extra_flags[0]?ICmpInst::ICMP_NE:ICmpInst::ICMP_EQ;
-        Value *cond = rinst.builder->CreateICmp(pred, rinst.builder->CreateIntCast(p.GetRegisterView(rinst, GetOps(1)[0]), rinst.GetType(64), false), rinst.CreateInt(64, 0));
+        Value *cond = rinst.builder->CreateICmp(pred, rinst.builder->CreateIntCast(p.GetRegisterView(rinst, GetOps(1)[0]), rinst.GetIntType(64), false), rinst.CreateInt(64, 0));
         p.CreateConditionalBranch(rinst, PrepareBranch(1), p.PrepareBranch(rinst, false_addr), cond);
     } return true;
     case AArch64_INS_TBNZ: extra_flags[0] = true; [[fallthrough]];
@@ -681,9 +681,9 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
         const auto ops = GetOps(2);
         p.FinalizeBranchContext(rinst);
         const VAddr false_addr = insn.address+4;
-        Value *value = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[0]), rinst.builder->CreateShl(ConstantInt::get(rinst.GetType(ops[0].size), 1), p.GetRegisterView(rinst, ops[1])));
+        Value *value = rinst.builder->CreateAnd(p.GetRegisterView(rinst, ops[0]), rinst.builder->CreateShl(ConstantInt::get(rinst.GetIntType(ops[0].size), 1), p.GetRegisterView(rinst, ops[1])));
         const auto pred = extra_flags[0]?ICmpInst::ICMP_NE:ICmpInst::ICMP_EQ;
-        Value *cond = rinst.builder->CreateICmp(pred, value, ConstantInt::get(rinst.GetType(ops[0].size), 0));
+        Value *cond = rinst.builder->CreateICmp(pred, value, ConstantInt::get(rinst.GetIntType(ops[0].size), 0));
         std::pair<BasicBlock *, BasicBlock *> branches = {PrepareBranch(2), p.PrepareBranch(rinst, false_addr)};
         p.CreateConditionalBranch(rinst, branches.first, branches.second, cond);
     } return true;
@@ -696,7 +696,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
     case AArch64_INS_CCMN: extra_flags[0] = true; [[fallthrough]];
     case AArch64_INS_CCMP: {
         const auto ops = GetOps(3);
-        Value *imm = rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[2]), rinst.GetType(8), false);
+        Value *imm = rinst.builder->CreateIntCast(p.GetRegisterView(rinst, ops[2]), rinst.GetIntType(8), false);
         Value *right_value = p.GetRegisterView(rinst, ops[1]);
         Value *condition = GetComparisonCondition();
         if (extra_flags[0])
@@ -717,8 +717,8 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
         case AArch64_SYSREG_CNTFRQ_EL0: value = rinst.CreateInt(32, rinst.rt.conf.cntfrq_el0); break;
         case AArch64_SYSREG_CTR_EL0: value = rinst.CreateInt(32, rinst.rt.conf.ctr_el0); break;
         case AArch64_SYSREG_DCZID_EL0: value = rinst.CreateInt(32, rinst.rt.conf.dczid_el0); break;
-        case AArch64_SYSREG_TPIDRRO_EL0: value = p.CreateLoadFromPtr(rinst, reinterpret_cast<const void *>(rinst.rt.conf.tpidrro_el0), rinst.GetType(64)); break;
-        case AArch64_SYSREG_TPIDR_EL0: value = p.CreateLoadFromPtr(rinst, reinterpret_cast<const void *>(rinst.rt.conf.tpidr_el0), rinst.GetType(64)); break;
+        case AArch64_SYSREG_TPIDRRO_EL0: value = p.CreateLoadFromPtr(rinst, reinterpret_cast<const void *>(rinst.rt.conf.tpidrro_el0), rinst.GetIntType(64)); break;
+        case AArch64_SYSREG_TPIDR_EL0: value = p.CreateLoadFromPtr(rinst, reinterpret_cast<const void *>(rinst.rt.conf.tpidr_el0), rinst.GetIntType(64)); break;
         default: {
             DYNAUTIC_ASSERT(!"Unknown MRS access");
             if (rinst.rt.conf.unsafe_unexpected_situation_handling) {
