@@ -82,10 +82,31 @@ public:
         return &branch->addr;
     }
 
-    llvm::Type *GetIntType(uint8_t bits);
-    llvm::Type *GetIntVectorType(uint8_t bits, uint8_t elements);
-    llvm::Type *GetRegType(const RegisterDescription& desc);
-    llvm::ConstantInt *CreateInt(uint8_t bits, uint64_t value);
+    llvm::Type *GetIntType(uint8_t bits) {
+        switch (bits) {
+        case 1: return builder->getInt1Ty();
+        case 8: return builder->getInt8Ty();
+        case 16: return builder->getInt16Ty();
+        case 32: return builder->getInt32Ty();
+        case 64: return builder->getInt64Ty();
+        case 128: return builder->getInt128Ty();
+        }
+
+        DYNAUTIC_ASSERT(!"Invalid bit count");
+        return nullptr;
+    }
+    llvm::Type *GetIntVectorType(uint8_t bits, uint8_t elements) {
+        return llvm::FixedVectorType::get(GetIntType(bits), elements);
+    }
+    llvm::Type *GetRegType(const RegisterDescription& desc) {
+        if (desc.type != RegisterDescription::Type::vector)
+            return GetIntType(desc.size);
+        else
+            return GetIntVectorType(desc.size, desc.elements);
+    }
+    llvm::ConstantInt *CreateInt(uint8_t bits, uint64_t value) {
+        return llvm::ConstantInt::get(reinterpret_cast<llvm::IntegerType*>(GetIntType(bits)), value);
+    }
 };
 }
 
