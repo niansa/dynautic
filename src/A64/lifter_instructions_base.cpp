@@ -68,13 +68,6 @@ uint8_t Lifter::InstructionLifter::GetLoadStoreFlagsAndSize(uint64_t id) {
 }
 
 bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
-    // Don't attempt to handle vector instructions
-    for (unsigned idx = 0; idx != detail.op_count; ++idx) {
-        const auto& op = detail.operands[idx];
-        if (op.vas != AArch64Layout_Invalid)
-            return false;
-    }
-
     // Base instructions
     switch (id) {
     // Logical and move instructions
