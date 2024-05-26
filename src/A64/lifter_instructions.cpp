@@ -149,7 +149,9 @@ Value *Lifter::InstructionLifter::GetMemOpReference(bool unscaled, unsigned op_i
         base = p.PerformShift(rinst, base, addrop.shift.type, static_cast<uint8_t>(addrop.shift.value));
     else
         displacement = static_cast<int32_t>(p.PerformShift(static_cast<uint64_t>(displacement), 32, addrop.shift.type, static_cast<uint8_t>(addrop.shift.value)));
-    Value *reference = rinst.builder->CreateAdd(base, p.GetRegisterView(rinst, {p.cs_handle, addrop.mem.index}));
+    Value *index = p.GetRegisterView(rinst, {p.cs_handle, addrop.mem.index});
+    index = p.PerformShift(rinst, index, addrop.shift.type, static_cast<uint8_t>(addrop.shift.value));
+    Value *reference = rinst.builder->CreateAdd(base, index);
     Value *displaced_reference = rinst.builder->CreateAdd(reference, ConstantInt::get(reference->getType(), static_cast<uint64_t>(displacement)));
     if (insn.detail->writeback)
         p.StoreRegister(rinst, base_reg, displaced_reference);
