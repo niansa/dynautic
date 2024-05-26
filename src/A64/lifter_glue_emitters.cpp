@@ -171,7 +171,7 @@ void Lifter::FinalizeBranchContext(Instance& rinst) {
 }
 
 void Lifter::CreatePCSave(Instance& rinst) {
-    CreateStoreToPtr(rinst, &rt.pc, rinst.CreateInt(64, rinst.pc));
+    CreateStoreToPtr(rinst, &rt.pc, rinst.CreateInt(64, rinst.pc+4));
 }
 
 Value *Lifter::CreateLoadFromGlobal(Instance& rinst, llvm::StringRef global_name, llvm::Type *type) {
