@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <cstring>
 #include <sys/mman.h>
+#include <dynarmic/interface/exclusive_monitor.h>
 #include <dynarmic/interface/A64/a64.h>
 #include <dynarmic/interface/A64/config.h>
 
@@ -131,6 +132,9 @@ public:
 
     uint64_t RunTest(std::vector<u32>&& instructions, std::array<u8, TestBase::mem_size>& memory, bool no_native_memory) override {
         (void)no_native_memory;
+
+        Dynarmic::ExclusiveMonitor em(4);
+        user_config.global_monitor = &em;
 
         u64 fres;
         std::vector<u64> cache;
