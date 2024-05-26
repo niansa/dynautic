@@ -39,6 +39,11 @@ struct Buffers {
 };
 
 __attribute__((noinline))
+void dump_regs(unsigned long a) {
+  asm("svc #6");
+}
+
+__attribute__((noinline))
 void example1 (struct Buffers *bfs) {
   int i;
 
@@ -331,8 +336,8 @@ unsigned long _start()
   BENCH("Example1",   example1(&bfs), Mi*10, digest_memory(&bfs.a[0], &bfs.a[256]));
   BENCH("Example2a",  example2a(&bfs, N, 2), Mi*4, digest_memory(&bfs.b[0], &bfs.b[N]));
   BENCH("Example2b",  example2b(&bfs, N, 2), Mi*2, digest_memory(&bfs.a[0], &bfs.a[N]));
-  // BENCH("Example3",   example3(&bfs, N, bfs.ia, bfs.ib), Mi*2, digest_memory(&bfs.ia[0], &bfs.ia[N]));   !!! BECOMES STUCK !!!
-  // BENCH("Example4a",  example4a(&bfs, N, bfs.ia, bfs.ib), Mi*2, digest_memory(&bfs.ia[0], &bfs.ia[N]));   !!! BECOMES STUCK !!!
+  BENCH("Example3",   example3(&bfs, N, bfs.ia, bfs.ib), Mi*2, digest_memory(&bfs.ia[0], &bfs.ia[N]));
+  BENCH("Example4a",  example4a(&bfs, N, bfs.ia, bfs.ib), Mi*2, digest_memory(&bfs.ia[0], &bfs.ia[N]));
   BENCH("Example4b",  example4b(&bfs, N-10, bfs.ia, bfs.ib), Mi*2, digest_memory(&bfs.ia[0], &bfs.ia[N]));
   BENCH("Example4c",  example4c(&bfs, N, bfs.ia, bfs.ib), Mi*2, digest_memory(&bfs.ib[0], &bfs.ib[N]));
   BENCH("Example7",   example7(&bfs, 4), Mi*4, digest_memory(&bfs.a[0], &bfs.a[N]));
