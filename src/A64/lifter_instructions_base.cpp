@@ -472,6 +472,36 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
         reference = rinst.builder->CreateAdd(reference, rinst.CreateInt(64, ops[0].size/8));
         p.CreateMemoryStore(rinst, reference, p.GetRegisterView(rinst, ops[1]));
     } return true;
+    case AArch64_INS_ALIAS_BFI: {
+        const auto ops = GetOps(2);
+        // Calculate bits
+        const auto lsb = static_cast<uint64_t>(detail.operands[2].imm);
+        const auto width = static_cast<uint64_t>(detail.operands[3].imm);
+        const auto end = lsb + width;
+        const auto mask = ((1ul << (end - lsb + 1ul)) - 1ul) << lsb;
+        // Generate instructions
+        Value *left = p.GetRegisterView(rinst, ops[0]);
+        Value *right = p.GetRegisterView(rinst, ops[1]);
+        left = rinst.builder->CreateAnd(left, ~mask);
+        right = rinst.builder->CreateAnd(rinst.builder->CreateShl(right, lsb), mask);
+        // Merge and store result to output register
+        p.StoreRegister(rinst, ops[0], rinst.builder->CreateOr(left, right));
+    } return true;
+    case AArch64_INS_ALIAS_BFXIL: {
+        const auto ops = GetOps(2);
+        // Calculate bits
+        const auto lsb = static_cast<uint64_t>(detail.operands[2].imm);
+        const auto width = static_cast<uint64_t>(detail.operands[3].imm);
+        const auto end = lsb + width;
+        const auto mask = ((1ul << (end - lsb + 1ul)) - 1ul) << lsb;;
+        // Generate instructions
+        Value *left = p.GetRegisterView(rinst, ops[0]);
+        Value *right = p.GetRegisterView(rinst, ops[1]);
+        left = rinst.builder->CreateLShr(rinst.builder->CreateAnd(left, ~mask), lsb);
+        right = rinst.builder->CreateAnd(right, mask>>lsb);
+        // Merge and store result to output register
+        p.StoreRegister(rinst, ops[0], rinst.builder->CreateOr(left, right));
+    } return true;
     case AArch64_INS_ALIAS_SBFX: extra_flags[signed_] = true; [[fallthrough]];
     case AArch64_INS_ALIAS_UBFX: {
         const auto ops = GetOps(2);

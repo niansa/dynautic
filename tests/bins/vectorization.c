@@ -346,7 +346,7 @@ unsigned long _start()
   BENCH("Example10a", example10a(&bfs, bfs.sa,bfs.sb,bfs.sc,bfs.ia,bfs.ib,bfs.ic), Mi*2, digest_memory(&bfs.ia[0], &bfs.ia[N]) + digest_memory(&bfs.sa[0], &bfs.sa[N]));
   BENCH("Example10b", example10b(&bfs, bfs.sa,bfs.sb,bfs.sc,bfs.ia,bfs.ib,bfs.ic), Mi*4, digest_memory(&bfs.ia[0], &bfs.ia[N]));
   BENCH("Example11",  example11(&bfs), Mi*2, digest_memory(&bfs.d[0], &bfs.d[N]));
-  // BENCH("Example12",  example12(&bfs), Mi*4, digest_memory(&bfs.a[0], &bfs.a[N]));   !!! UNKNOWN INSTRUCTION !!!
+  BENCH("Example12",  example12(&bfs), Mi*4, digest_memory(&bfs.a[0], &bfs.a[N]));
   BENCH("Example23",  example23(&bfs, bfs.usa,bfs.ua), Mi*8, digest_memory(&bfs.usa[0], &bfs.usa[256]));
   //BENCH("Example24",  example24(&bfs, 2,4), Mi*2, 0);
   //BENCH("Example25",  example25(&bfs), Mi*2, digest_memory(&bfs.dj[0], &bfs.dj[N]));
