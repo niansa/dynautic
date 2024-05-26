@@ -218,7 +218,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
         Value *right = p.PerformShift(rinst, p.GetRegisterView(rinst, ops[2], rinst.GetRegType(ops[1])), shift_type, shift);
         SetComparison(left, right);
         p.StoreRegister(rinst, ops[0], rinst.builder->CreateSub(left, right));
-    } [[fallthrough]];
+    } return true;
     case AArch64_INS_ALIAS_SUB:
     case AArch64_INS_SUB: {
         Handle3Ops(CreateSub);
