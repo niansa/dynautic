@@ -322,7 +322,7 @@ llvm::FunctionCallee Lifter::GetExclusiveMonitorIsPoisonedTrampoline(Instance& r
 
 #ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
 llvm::FunctionCallee Lifter::GetDebugPrintTrampoline(Instance& rinst) {
-    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.GetType(64)}, false);
+    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.GetIntType(64)}, false);
     return rinst.module->getOrInsertFunction("DebugPrintTrampoline", ftype);
 }
 
