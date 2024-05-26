@@ -291,13 +291,15 @@ unsigned digest_memory(void *start, void* end) {
 #define BENCH(NAME, RUN_LINE, ITER, DIGEST_LINE) {\
   RUN_LINE;\
   for (int i=0; i < (ITER); ++i) RUN_LINE;\
-  DIGEST_LINE;\
+  fres += DIGEST_LINE;\
  }
 
 
 __attribute__((section(".start")))
 unsigned long _start()
 {
+  unsigned fres = 0;
+
   struct Buffers bfs;
 
   unsigned dummy = 0;
@@ -344,5 +346,5 @@ unsigned long _start()
   //BENCH("Example24",  example24(&bfs, 2,4), Mi*2, 0);
   //BENCH("Example25",  example25(&bfs), Mi*2, digest_memory(&bfs.dj[0], &bfs.dj[N]));
 
-  return 0;
+  return fres;
 }
