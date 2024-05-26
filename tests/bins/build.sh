@@ -10,4 +10,4 @@ for source in *.c *.s; do
     done
 done
 
-rm brainfuck.c-O0.bin primes.c-O0.bin
+rm brainfuck.c-O0.bin primes.c-O0.bin *.s-O3.*
