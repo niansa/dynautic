@@ -165,9 +165,17 @@ void Lifter::InstructionLifter::DeferCompilation(bool repeat_instruction) {
     p.CreateLiftTrampoline(rinst, insn.address, rinst.CreateInt(64, insn.address+(repeat_instruction?0:4)));
 }
 
-bool Lifter::InstructionLifter::Run() {    
+bool Lifter::InstructionLifter::Run(bool first_instruction) {
     // Update PC
     rinst.pc = insn.address;
+
+    // Branch if code already been generated here
+    if (!first_instruction) {
+        if (auto basic_block = rinst.GetBranch(insn.address)) {
+            p.CreateBranch(rinst, basic_block);
+            return false;
+        }
+    }
 
     // Check alignment
     DYNAUTIC_ASSERT((insn.address % 4) == 0);

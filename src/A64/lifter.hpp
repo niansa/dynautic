@@ -165,7 +165,7 @@ class Lifter {
     void OptimizeModule(llvm::Module&);
 
     void LiftLeaf(Instance&, VAddr addr);
-    bool LiftInstruction(Instance&, const cs_insn&, const std::vector<VAddr>& noexec_addrs = {});
+    bool LiftInstruction(Instance&, const cs_insn&, bool first_instruction, const std::vector<VAddr>& noexec_addrs = {});
 
     static std::string GetFunctionName(VAddr addr);
 

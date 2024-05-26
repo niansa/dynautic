@@ -33,6 +33,13 @@ bool Lifter::Instance::NextBranch() {
     return true;
 }
 
+BasicBlock *Lifter::Instance::GetBranch(VAddr addr) const {
+    for (const auto& branch : branches)
+        if (branch->addr == addr)
+            return branch->basic_block;
+    return nullptr;
+}
+
 BasicBlock *Lifter::Instance::QueueBranch(VAddr addr, const Twine &name) {
     // Try to find existing branch
     for (const auto& branch : branches)

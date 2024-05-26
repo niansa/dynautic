@@ -150,6 +150,7 @@ void Lifter::LiftLeaf(Instance& rinst, VAddr addr) {
     // Lift instructions in blocks
     std::array<uint8_t, 0x100> block;
     static_assert((block.size()%4) == 0);
+    bool first_instruction = true;
     for (bool stop = false; !stop; addr += block.size()) {
         // Read block
         for (unsigned off = 0; off != block.size(); off += 4) {
@@ -169,10 +170,11 @@ void Lifter::LiftLeaf(Instance& rinst, VAddr addr) {
 
         // Lift all instructions
         for (unsigned i = 0; i != count; ++i) {
-            if (!LiftInstruction(rinst, insns[i]) || rinst.block_terminated) {
+            if (!LiftInstruction(rinst, insns[i], first_instruction, noexec_addrs) || rinst.block_terminated) {
                 stop = true;
                 break;
             }
+            first_instruction = false;
         }
 
         // Clean up disassembly
@@ -188,12 +190,12 @@ void Lifter::LiftLeaf(Instance& rinst, VAddr addr) {
         uint8_t udf[4] = {0xff, 0xff, 0xff, 0xff};
         cs_insn *insns;
         cs_disasm(cs_handle, udf, sizeof(udf), addr, 0, &insns);
-        LiftInstruction(rinst, *insns, noexec_addrs);
+        LiftInstruction(rinst, *insns, false);
         cs_free(insns, 1);
     }
 }
 
-bool Lifter::LiftInstruction(Instance& rinst, const cs_insn& insn, const std::vector<VAddr>& noexec_addrs) {
-    return InstructionLifter(*this, rinst, insn, noexec_addrs).Run();
+bool Lifter::LiftInstruction(Instance& rinst, const cs_insn& insn, bool first_instruction, const std::vector<VAddr>& noexec_addrs) {
+    return InstructionLifter(*this, rinst, insn, noexec_addrs).Run(first_instruction);
 }
 }

@@ -20,7 +20,7 @@ private:
     struct Branch {
         llvm::BasicBlock *basic_block;
         bool dynamic = false;
-        VAddr addr, origin;
+        VAddr addr = -1, origin;
         llvm::BasicBlock *current_basic_block;
 
         Branch(Lifter::Instance& parent, const llvm::Twine& name) {
@@ -66,6 +66,7 @@ public:
 
     bool NextBranch();
 
+    llvm::BasicBlock *GetBranch(VAddr addr) const;
     llvm::BasicBlock *QueueBranch(VAddr addr, const llvm::Twine& name);
     llvm::BasicBlock *QueueDynamicBranch(VAddr*& addr, VAddr origin, const llvm::Twine& name);
 

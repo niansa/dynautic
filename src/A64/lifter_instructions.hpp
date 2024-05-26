@@ -71,7 +71,7 @@ public:
         p.ResetScratchRegisters();
     }
 
-    bool Run();
+    bool Run(bool first_instruction);
 };
 }
 
