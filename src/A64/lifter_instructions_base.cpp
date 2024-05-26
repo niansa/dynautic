@@ -334,7 +334,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
     case AArch64_INS_ALIAS_CMN: extra_flags[0] = true; [[fallthrough]];
     case AArch64_INS_ALIAS_CMP: {
         const auto ops = GetOps(2);
-        Value *right_value = p.GetRegisterView(rinst, ops[1]);
+        Value *right_value = p.PerformShift(rinst, p.GetRegisterView(rinst, ops[1]), shift_type, shift);
         if (extra_flags[0])
             right_value = rinst.builder->CreateNot(right_value);
         SetComparison(p.GetRegisterView(rinst, ops[0]), right_value);
