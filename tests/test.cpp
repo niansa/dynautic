@@ -307,6 +307,12 @@ int main(int argc, char** argv) {
                       0xd65f03c0  // ret
                   }, reference);
 
+    dynautic->RunTest("Simple vector creation", {
+                      0x0f00a4e0, // movi v0.4h, #7, lsl #8
+                      0x9e660000, // fmov x0, d0
+                      0xd65f03c0  // ret
+                  }, reference);
+
     dynautic->RunTest("Simple vector addition", {
                       0x9e670000, // fmov d0, x0
                       0x9e670021, // fmov d1, x1
