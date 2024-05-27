@@ -23,12 +23,15 @@ bool Lifter::InstructionLifter::VectorInstructions(uint64_t id) {
         DYNAUTIC_ASSERT(op.type == RegisterDescription::Type::vector);
         VectorType *type = reinterpret_cast<VectorType*>(rinst.GetRegType(op));
         Type *elem_type = type->getElementType();
-        Value *value = Constant::getNullValue(type);
         const auto imm = p.PerformShift(immop.imm, static_cast<uint8_t>(elem_type->getIntegerBitWidth()), shift_type, shift);
-        value = rinst.builder->CreateInsertElement(value, ConstantInt::get(elem_type, imm), 0ul);
-        static const int mask[64] = {};
-        value = rinst.builder->CreateShuffleVector(value, ArrayRef<int>(mask, op.elements));
-        p.StoreRegister(rinst, op, value);
+        p.StoreRegister(rinst, op, ConstantInt::get(type, imm));
+    } return true;
+    case AArch64_INS_CMGT: { // Untested...
+        const auto ops = GetOps(3);
+        DYNAUTIC_ASSERT(ops[0].type == RegisterDescription::Type::vector);
+        Value *value = rinst.builder->CreateCmp(CmpInst::ICMP_SGT, p.GetRegisterView(rinst, ops[1]), p.GetRegisterView(rinst, ops[2]));
+        value = rinst.builder->CreateSExt(value, rinst.GetRegType(ops[0]));
+        p.StoreRegister(rinst, ops[0], value);
     } return true;
     }
 
