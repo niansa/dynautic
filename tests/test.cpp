@@ -321,6 +321,13 @@ int main(int argc, char** argv) {
                       0xd65f03c0  // ret
                   }, reference);
 
+    dynautic->RunTest("Simple vector reduction addition", {
+                      0x9e670000, // fmov d0, x0
+                      0x0e71b800, // addv h0, v0.4h
+                      0x9e660000, // fmov x0, d0
+                      0xd65f03c0  // ret
+                  }, reference);
+
     for (const auto& entry : std::filesystem::directory_iterator(TEST_BINS)) {
         if (!entry.is_regular_file())
             continue;

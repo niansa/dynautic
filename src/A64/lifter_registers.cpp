@@ -19,6 +19,7 @@ RegisterDescription::RegisterDescription(const char *name, VectorLayout vas) {
     case 'w': size = Size::word; type = Type::general; break;
     case 'r': [[fallthrough]];
     case 'x': size = Size::double_word; type = Type::general; break;
+    case 'h': size = Size::half; type = Type::scalar; break;
     case 's': size = Size::single; type = Type::scalar; break;
     case 'd': size = Size::double_; type = Type::scalar; break;
     case 'q': size = Size::quad; type = Type::scalar; break;

@@ -33,6 +33,13 @@ bool Lifter::InstructionLifter::VectorInstructions(uint64_t id) {
         value = rinst.builder->CreateSExt(value, rinst.GetRegType(ops[0]));
         p.StoreRegister(rinst, ops[0], value);
     } return true;
+    case AArch64_INS_ADDV: {
+        const auto ops = GetOps(2);
+        DYNAUTIC_ASSERT(ops[0].size == ops[1].size);
+        Value *value = p.GetRegisterView(rinst, ops[1]);
+        value = rinst.builder->CreateIntrinsic(rinst.GetRegType(ops[0]), Intrinsic::vector_reduce_add, value);
+        p.StoreRegister(rinst, ops[0], value);
+    } return true;
     }
 
     // We couldn't handle this instruction
