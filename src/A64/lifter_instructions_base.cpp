@@ -10,7 +10,6 @@
 #endif
 
 using namespace llvm;
-using namespace llvm::orc;
 
 
 namespace Dynautic::A64 {

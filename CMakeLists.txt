@@ -29,6 +29,8 @@ add_library(dynautic STATIC
                        src/A64/lifter_instructions.hpp src/A64/lifter_instructions.cpp
                                                        src/A64/lifter_instructions_macros.hpp
                                                        src/A64/lifter_instructions_base.cpp
+                                                       src/A64/lifter_instructions_vector.cpp
+                                                       src/A64/lifter_instructions_fp.cpp
                        src/A64/lifter_registers.cpp
                        src/A64/lifter_shifts.cpp
                        src/A64/lifter_glue_emitters.cpp
