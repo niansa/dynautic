@@ -20,7 +20,7 @@ private:
     struct Branch {
         llvm::BasicBlock *basic_block;
         bool dynamic = false;
-        VAddr addr = -1, origin;
+        VAddr addr = static_cast<VAddr>(-1), origin;
         llvm::BasicBlock *current_basic_block;
 
         Branch(Lifter::Instance& parent, const llvm::Twine& name) {
