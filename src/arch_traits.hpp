@@ -6,7 +6,7 @@ namespace ArchTraits {
 #if defined(__x86_64__)
 constexpr unsigned max_arg_count = 6;
 #elif defined(__aarch64__)
-constexpr unsigned max_arg_count = 0;
+constexpr unsigned max_arg_count = 8;
 #else
 constexpr unsigned max_arg_count = 0;
 #endif
