@@ -652,7 +652,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
                 case AArch64_INS_STXP: intr = Intrinsic::aarch64_stxp; break;
                 }
                 CallInst *result = rinst.builder->CreateIntrinsic(rinst.GetIntType(32), intr, {p.GetRegisterView(rinst, ops[1]), p.GetRegisterView(rinst, ops[2]), reference});
-                result->addParamAttr(2, Attribute::get(*rinst.context, Attribute::ElementType, rinst.GetRegType(ops[1].size)));
+                result->addParamAttr(2, Attribute::get(*rinst.context, Attribute::ElementType, rinst.GetRegType(ops[1])));
                 p.StoreRegister(rinst, ops[0], result);
             } else {
 #endif
