@@ -441,7 +441,7 @@ bool Lifter::InstructionLifter::BaseInstructions(uint64_t id) {
         if (extra_flags[exclusive] && !p.rt.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)) {
 #ifdef __aarch64__
             if (p.rt.conf.native_memory) {
-                Type *type = rinst.GetRegType(ops[0].size);
+                Type *type = rinst.GetRegType(ops[0]);
                 reference = rinst.builder->CreateIntToPtr(reference, rinst.builder->getPtrTy());
                 CallInst *result = rinst.builder->CreateIntrinsic(type, Intrinsic::aarch64_ldxp, {reference});
                 result->addParamAttr(0, Attribute::get(*rinst.context, Attribute::ElementType, type));

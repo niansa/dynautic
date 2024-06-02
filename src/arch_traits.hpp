@@ -3,8 +3,10 @@
 
 namespace Dynautic {
 namespace ArchTraits {
-#ifdef __x86_64__
+#if defined(__x86_64__)
 constexpr unsigned max_arg_count = 6;
+#elif defined(__aarch64__)
+constexpr unsigned max_arg_count = 0;
 #else
 constexpr unsigned max_arg_count = 0;
 #endif
