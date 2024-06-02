@@ -3,10 +3,11 @@
 
 namespace Dynautic {
 namespace ArchTraits {
-
+#ifdef __x86_64__
 constexpr unsigned max_arg_count = 6;
-
-static_assert(max_arg_count <= 16);
+#else
+constexpr unsigned max_arg_count = 0;
+#endif
 }
 }
 
