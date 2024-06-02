@@ -44,7 +44,8 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
     DYNAUTIC_ASSERT(IsOk() && rt.jit);
 
     // Skip if already compiled
-    if (auto expected_address = rt.jit->lookup(GetFunctionName(addr)))
+    const auto entry_fnc_name = GetFunctionName(addr)+"Entry";
+    if (auto expected_address = rt.jit->lookup(entry_fnc_name))
         return expected_address.get();
 
     // Enqueue address
@@ -68,10 +69,16 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
         }
 
         // Get function name
-        const std::string function_name = GetFunctionName(addr);
+        const auto fnc_name = GetFunctionName(addr);
+
+        // Skip if already compiled in another module
+        if (rt.jit->lookup(fnc_name)) {
+            queued_functions.pop();
+            continue;
+        }
 
         // Create entry block and branch
-        Instance rinst(rt, context.get(), module.get(), function_name);
+        Instance rinst(rt, context.get(), module.get(), fnc_name);
         rinst.UseBasicBlock(rinst.CreateBasicBlock("EntryBlock"));
         UndirtyFunctionContext();
         LoadFunctionContext(rinst, true);
@@ -102,6 +109,13 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
         DYNAUTIC_ASSERT(!rt_allocas.dirty);
     }
 
+    // Create entry function
+    Instance rinst(rt, context.get(), module.get(), entry_fnc_name);
+    rinst.UseBasicBlock(rinst.CreateBasicBlock("EntryBlock"));
+    UndirtyFunctionContext();
+    LoadFunctionContext(rinst, true, true);
+    CreateCall(rinst, static_cast<VAddr>(-1), addr);
+
 #ifdef ENABLE_LLVM_VALIDATION
     // Run verifier
     VerifierAnalysis verifier;
@@ -128,7 +142,7 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
     }
 
     // Look up added function and return address
-    return rt.jit->lookup(GetFunctionName(addr)).get();
+    return rt.jit->lookup(entry_fnc_name).get();
 }
 
 void Lifter::DeferLift(VAddr addr) {

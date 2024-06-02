@@ -1,4 +1,5 @@
 #include "lifter_instance.hpp"
+#include "../arch_traits.hpp"
 #include "../llvm.hpp"
 
 using namespace llvm;
@@ -6,12 +7,18 @@ using namespace llvm::orc;
 
 
 namespace Dynautic::A64 {
+llvm::ArrayRef<Type *> Lifter::Instance::GetFunctionArgTypes() const {
+    thread_local static std::array<llvm::Type*, ArchTraits::max_arg_count> fres;
+    fres.fill(Type::getInt64Ty(*context));
+    return fres;
+}
+
 Lifter::Instance::Instance(Runtime::Impl& runtime, llvm::LLVMContext *context, llvm::Module *module, const std::string& function_name)
       : rt(runtime), context(context), module(module) {
     // Try to get function first, if that fails, create
     if (!(func = module->getFunction(function_name))) {
         func = Function::Create(FunctionType::get(Type::getVoidTy(*context),
-                                                  {}, false),
+                                                  GetFunctionArgTypes(), false),
                                 Function::ExternalLinkage, function_name, *module);
     }
     func->setCallingConv(CallingConv::Tail);
@@ -19,7 +26,7 @@ Lifter::Instance::Instance(Runtime::Impl& runtime, llvm::LLVMContext *context, l
 
 llvm::FunctionCallee Lifter::Instance::DeclareFunction(llvm::StringRef name) {
     return module->getOrInsertFunction(name, FunctionType::get(Type::getVoidTy(*context),
-                                                               {}, false));
+                                                               GetFunctionArgTypes(), false));
 }
 
 bool Lifter::Instance::NextBranch() {

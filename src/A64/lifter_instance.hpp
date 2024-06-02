@@ -43,6 +43,8 @@ private:
     std::vector<std::unique_ptr<Branch>> branches;
     llvm::BasicBlock *current_basic_block;
 
+    llvm::ArrayRef<llvm::Type*> GetFunctionArgTypes() const;
+
 public:
     std::optional<llvm::IRBuilder<>> builder;
     bool block_terminated;

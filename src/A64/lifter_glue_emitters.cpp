@@ -2,6 +2,7 @@
 #include "lifter_instance.hpp"
 #include "runtime.hpp"
 #include "cache.hpp"
+#include "../arch_traits.hpp"
 #include "../llvm.hpp"
 
 #include <optional>
@@ -17,7 +18,14 @@ using namespace llvm::orc;
 
 
 namespace Dynautic::A64 {
-void Lifter::LoadFunctionContext(Instance& rinst, bool new_allocas) {
+llvm::ArrayRef<Value *> Lifter::GetFunctionArgs() const {
+    thread_local static std::array<llvm::Value*, ArchTraits::max_arg_count> fres;
+    for (unsigned it = 0; it != fres.size(); ++it)
+        fres[it] = rt_values.registers[it];
+    return fres;
+}
+
+void Lifter::LoadFunctionContext(Instance& rinst, bool new_allocas, bool load_all) {
     rt_allocas.dirty = true;
 
     // Fill in stack pointer
@@ -29,7 +37,10 @@ void Lifter::LoadFunctionContext(Instance& rinst, bool new_allocas) {
     for (unsigned idx = 0; idx != rt_allocas.registers.size(); ++idx) {
         if (new_allocas)
             rt_allocas.registers[idx] = rinst.builder->CreateAlloca(rinst.GetIntType(64), nullptr, "alloca_x"+std::to_string(idx)+'_');
-        CreateLoadFromGlobalIntoPtr(rinst, "general_register_"+std::to_string(idx), rinst.GetIntType(64), rt_allocas.registers[idx]);
+        if (idx < (load_all?0:ArchTraits::max_arg_count))
+            rinst.builder->CreateStore(dyn_cast<Value>(rinst.func->getArg(idx)), rt_allocas.registers[idx]);
+        else
+            CreateLoadFromGlobalIntoPtr(rinst, "general_register_"+std::to_string(idx), rinst.GetIntType(64), rt_allocas.registers[idx]);
     }
 
     // Fill in vector registers
@@ -58,7 +69,7 @@ void Lifter::LoadFunctionContext(Instance& rinst, bool new_allocas) {
     // Load branch context
     LoadBranchContext(rinst);
 }
-void Lifter::FinalizeFunctionContext(Instance& rinst) {
+void Lifter::FinalizeFunctionContext(Instance& rinst, bool store_all) {
     // Finalize branch context
     if (rt_values.dirty)
         FinalizeBranchContext(rinst);
@@ -68,16 +79,14 @@ void Lifter::FinalizeFunctionContext(Instance& rinst) {
         CreateStoreToGlobal(rinst, "stack_pointer", rinst.builder->CreateLoad(rinst.GetIntType(64), rt_allocas.stack_pointer));
 
     // Write out general purpose registers
-    for (unsigned idx = 0; idx !=rt_allocas. registers.size(); ++idx) {
-        if (rt_allocas.dirty_registers[idx])
+    for (unsigned idx = store_all?0:ArchTraits::max_arg_count; idx != rt_allocas.registers.size(); ++idx)
+        if (rt_allocas.dirty_registers[idx] || (store_all && idx < ArchTraits::max_arg_count))
             CreateStoreToGlobal(rinst, "general_register_"+std::to_string(idx), rinst.builder->CreateLoad(rinst.GetIntType(64), rt_allocas.registers[idx]));
-    }
 
     // Write out vector registers
-    for (unsigned idx = 0; idx != rt_allocas.vectors.size(); ++idx) {
+    for (unsigned idx = 0; idx != rt_allocas.vectors.size(); ++idx)
         if (rt_allocas.dirty_vectors[idx])
             CreateStoreToGlobal(rinst, "vector_register_"+std::to_string(idx), rinst.builder->CreateLoad(rinst.GetIntType(128), rt_allocas.vectors[idx]));
-    }
 
     // Write out comparisation
     if (rt_allocas.dirty_comparison) {
@@ -135,7 +144,7 @@ void Lifter::FinalizeBranchContext(Instance& rinst) {
     }
 
     // Write out general purpose registers
-    for (unsigned idx = 0; idx !=rt_values. registers.size(); ++idx) {
+    for (unsigned idx = 0; idx != rt_values.registers.size(); ++idx) {
         if (rt_values.dirty_registers[idx]) {
             rinst.builder->CreateStore(rt_values.registers[idx], rt_allocas.registers[idx]);
             rt_allocas.dirty_registers[idx] = true;
@@ -181,7 +190,7 @@ void Lifter::CreateLoadFromGlobalIntoPtr(Instance &rinst, llvm::StringRef global
     rinst.builder->CreateStore(CreateLoadFromGlobal(rinst, global_name, type), ptr);
 }
 void Lifter::CreateStoreToGlobal(Instance& rinst, llvm::StringRef global_name, llvm::Value *value) {
-    rinst.builder->CreateStore(value, rinst.module->getNamedGlobal(global_name));
+    rinst.builder->CreateStore(value, rinst.module->getOrInsertGlobal(global_name, value->getType()));
 }
 
 Value *Lifter::CreateLoadFromPtr(Instance& rinst, const void *ptr, Type *type, const llvm::Twine& name) {
@@ -237,7 +246,7 @@ void Lifter::CreateCall(Instance& rinst, VAddr origin, VAddr address) {
     CreateDebugPrintTrampoline(rinst, "Branching to constant offset");
 
     // Use deferring lift if configured to
-    if (!rt.conf.HasOptimization(OptimizationFlag::BlockLinking))
+    if (origin != static_cast<VAddr>(-1) && !rt.conf.HasOptimization(OptimizationFlag::BlockLinking))
         return CreateCall(rinst, origin, rinst.CreateInt(64, address));
 
     // Prepare for call
@@ -245,7 +254,7 @@ void Lifter::CreateCall(Instance& rinst, VAddr origin, VAddr address) {
     // Try to lift given instruction
     DeferLift(address);
     // Call into lifted address
-    CallInst *call = rinst.builder->CreateCall(Lifter::GetLiftedFunction(rinst, address));
+    CallInst *call = rinst.builder->CreateCall(Lifter::GetLiftedFunction(rinst, address), GetFunctionArgs());
     call->setTailCall();
     call->setCallingConv(CallingConv::Tail);
     rinst.builder->CreateRetVoid();
@@ -345,7 +354,7 @@ void Lifter::CreateLiftTrampolineBlock(Instance& rinst, VAddr origin, bool no_ca
     Value *self = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(this)), rinst.builder->getPtrTy());
 
     if (!rt.conf.fully_static) {
-        FinalizeFunctionContext(rinst);
+        FinalizeFunctionContext(rinst, true);
         CallInst *call = rinst.builder->CreateCall(GetLiftTrampoline(rinst), {self, address});
         call->setTailCall();
         call->setCallingConv(CallingConv::Tail);
@@ -355,8 +364,6 @@ void Lifter::CreateLiftTrampolineBlock(Instance& rinst, VAddr origin, bool no_ca
 }
 
 void Lifter::CreateLiftTrampoline(Instance& rinst, VAddr origin, Value *addr, bool no_cache) {
-    FinalizeFunctionContext(rinst);
-
     if (!no_cache) {
         CreateUseDynamicBranchCache(rinst, origin, addr);
         if (rinst.block_terminated)
@@ -365,6 +372,7 @@ void Lifter::CreateLiftTrampoline(Instance& rinst, VAddr origin, Value *addr, bo
 
     Value *self = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(this)), rinst.builder->getPtrTy());
 
+    FinalizeFunctionContext(rinst, true);
     if (!rt.conf.fully_static) {
         CallInst *call = rinst.builder->CreateCall(GetLiftTrampoline(rinst), {self, addr});
         call->setTailCall();
@@ -377,25 +385,26 @@ void Lifter::CreateLiftTrampoline(Instance& rinst, VAddr origin, Value *addr, bo
 void Lifter::CreateSvcTrampoline(Instance& rinst, uint32_t swi) {
     Value *runtime = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
 
-    FinalizeFunctionContext(rinst);
+    FinalizeFunctionContext(rinst, true);
     CreatePCSave(rinst);
     rinst.builder->CreateCall(GetSvcTrampoline(rinst), {runtime, rinst.CreateInt(32, swi)});
-    LoadFunctionContext(rinst);
+    LoadFunctionContext(rinst, false, true);
 }
 
 void Lifter::CreateExceptionTrampoline(Instance& rinst, Exception exception) {
     Value *runtime = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
 
-    FinalizeFunctionContext(rinst);
+    FinalizeFunctionContext(rinst, true);
     CreatePCSave(rinst);
     rinst.builder->CreateCall(GetExceptionTrampoline(rinst), {runtime, rinst.CreateInt(64, rinst.pc), rinst.CreateInt(32, static_cast<uint32_t>(exception))});
     CreateLiftTrampoline(rinst, rinst.pc, rinst.CreateInt(64, rinst.pc));
+    LoadFunctionContext(rinst, false, true);
 }
 
 void Lifter::CreateFreezeTrampoline(Instance& rinst) {
     Value *runtime = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
 
-    FinalizeFunctionContext(rinst);
+    FinalizeFunctionContext(rinst, true);
     CreatePCSave(rinst);
     rinst.builder->CreateCall(GetFreezeTrampoline(rinst), {runtime});
     rinst.builder->CreateRetVoid();

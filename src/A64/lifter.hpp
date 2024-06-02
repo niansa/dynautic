@@ -110,10 +110,12 @@ class Lifter {
     llvm::Value *PerformShift(Instance&, llvm::Value *, aarch64_shifter type, uint8_t shift);
     uint64_t PerformShift(uint64_t, uint8_t bits, aarch64_shifter type, uint8_t shift);
 
+    llvm::ArrayRef<llvm::Value*> GetFunctionArgs() const;
+
     void LoadBranchContext(Instance&);
     void FinalizeBranchContext(Instance&);
-    void LoadFunctionContext(Instance&, bool new_allocas = false);
-    void FinalizeFunctionContext(Instance&);
+    void LoadFunctionContext(Instance&, bool new_allocas = false, bool load_all = false);
+    void FinalizeFunctionContext(Instance&, bool store_all = false);
     void UndirtyFunctionContext();
     void CreatePCSave(Instance&);
 

@@ -21,6 +21,7 @@ add_library(dynautic STATIC
     include/dynautic/common.hpp include/dynautic/optimization.hpp
     include/dynautic/A64.hpp
     src/llvm.hpp
+    src/arch_traits.hpp
     src/globalmonitor.hpp src/globalmonitor.cpp
     src/A64/runtime.hpp src/A64/runtime.cpp
     src/A64/cache.hpp src/A64/cache.cpp
