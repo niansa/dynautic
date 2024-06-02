@@ -4,6 +4,8 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
+#include <unordered_map>
 #include <queue>
 #include <optional>
 #include <dynautic/A64.hpp>
@@ -76,6 +78,8 @@ class Lifter {
     csh cs_handle;
 
     std::queue<VAddr> queued_functions;
+    std::vector<VAddr> compiled_functions;
+    std::unordered_map<VAddr, llvm::orc::ExecutorAddr> entries;
 
     struct RuntimeValues {
         bool dirty{};

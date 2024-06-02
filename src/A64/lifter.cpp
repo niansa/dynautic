@@ -43,10 +43,10 @@ FunctionCallee Lifter::GetLiftedFunction(Instance& rinst, VAddr addr) {
 std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
     DYNAUTIC_ASSERT(IsOk() && rt.jit);
 
-    // Skip if already compiled
-    const auto entry_fnc_name = GetFunctionName(addr)+"Entry";
-    if (auto expected_address = rt.jit->lookup(entry_fnc_name))
-        return expected_address.get();
+    // Skip if entry already compiled
+    for (const auto& [that_addr, entry] : entries)
+        if (that_addr == addr)
+            return entry;
 
     // Enqueue address
     queued_functions.emplace(addr);
@@ -62,23 +62,19 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
     while (!queued_functions.empty()) {
         const VAddr addr = queued_functions.front();
 
+        // Remove function from queue
+        queued_functions.pop();
+
         // Skip already processed functions
-        if (std::find(processed_fncs.begin(), processed_fncs.end(), addr) != processed_fncs.end()) {
-            queued_functions.pop();
+        if (std::find(processed_fncs.begin(), processed_fncs.end(), addr) != processed_fncs.end())
             continue;
-        }
 
-        // Get function name
-        const auto fnc_name = GetFunctionName(addr);
-
-        // Skip if already compiled in another module
-        if (rt.jit->lookup(fnc_name)) {
-            queued_functions.pop();
+        // Skip if already compiled
+        if (std::find(compiled_functions.begin(), compiled_functions.end(), addr) != compiled_functions.end())
             continue;
-        }
 
         // Create entry block and branch
-        Instance rinst(rt, context.get(), module.get(), fnc_name);
+        Instance rinst(rt, context.get(), module.get(), GetFunctionName(addr));
         rinst.UseBasicBlock(rinst.CreateBasicBlock("EntryBlock"));
         UndirtyFunctionContext();
         LoadFunctionContext(rinst, true);
@@ -102,12 +98,12 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
         // Add function to list of processed functions
         processed_fncs.push_back(addr);
 
-        // Remove function from queue
-        queued_functions.pop();
-
         // Ensure function context has been synced up properly
         DYNAUTIC_ASSERT(!rt_allocas.dirty);
     }
+
+    // Get entry function name
+    const auto entry_fnc_name = GetFunctionName(addr)+"Entry";
 
     // Create entry function
     Instance rinst(rt, context.get(), module.get(), entry_fnc_name);
@@ -141,8 +137,13 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
         return {};
     }
 
-    // Look up added function and return address
-    return rt.jit->lookup(entry_fnc_name).get();
+    // Insert list of processed functions into list of compiled functions
+    compiled_functions.insert(compiled_functions.end(), processed_fncs.begin(), processed_fncs.end());
+
+    // Look up added function, add it to list and return address
+    const auto fres = rt.jit->lookup(entry_fnc_name).get();
+    entries.emplace(addr, fres);
+    return fres;
 }
 
 void Lifter::DeferLift(VAddr addr) {
