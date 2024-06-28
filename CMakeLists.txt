@@ -8,8 +8,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(LLVM 17 REQUIRED)
 separate_arguments(LLVM_DEFINITIONS)
 
-include(cppharden/harden.cmake)
-
 set(CAPSTONE_BUILD_TESTS OFF)
 set(CAPSTONE_BUILD_STATIC OFF)
 set(CAPSTONE_BUILD_STATIC_RUNTIME OFF)
@@ -44,7 +42,6 @@ target_link_libraries(dynautic PRIVATE capstone)
 target_precompile_headers(dynautic PRIVATE src/llvm.hpp)
 target_compile_options(dynautic PRIVATE -fno-exceptions -funwind-tables)
 llvm_config(dynautic USE_SHARED core executionengine orcjit nativecodegen)
-target_hardening(dynautic)
 target_compile_options(dynautic PRIVATE -Wno-error=cast-qual -Wno-error=implicit-fallthrough -Wno-string-conversion -Wno-sign-conversion)
 
 if (CMAKE_BUILD_TYPE MATCHES "^Deb")
