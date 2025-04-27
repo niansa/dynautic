@@ -35,6 +35,7 @@ add_library(dynautic STATIC
                        src/A64/lifter_glue_emitters.cpp
                        src/A64/lifter_conditions.cpp
                        src/A64/lifter_trampolines.cpp
+                       src/timer.hpp
 )
 target_include_directories(dynautic PRIVATE ${LLVM_INCLUDE_DIRS} PUBLIC include)
 target_compile_definitions(dynautic PRIVATE ${LLVM_DEFINITIONS})
@@ -42,15 +43,17 @@ target_link_libraries(dynautic PRIVATE capstone ubsan)
 target_precompile_headers(dynautic PRIVATE src/llvm.hpp)
 target_compile_options(dynautic PRIVATE -fno-exceptions -funwind-tables)
 llvm_config(dynautic USE_SHARED core executionengine orcjit nativecodegen)
-target_compile_options(dynautic PRIVATE -Wno-error=cast-qual -Wno-error=implicit-fallthrough -Wno-string-conversion -Wno-sign-conversion -fsanitize=bounds,null,return,unreachable)
+target_compile_options(dynautic PRIVATE -Wno-error=cast-qual -Wno-error=implicit-fallthrough -Wno-string-conversion -Wno-sign-conversion)
 
-if (CMAKE_BUILD_TYPE MATCHES "^Deb")
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_definitions(dynautic PRIVATE
         ENABLE_LLVM_VALIDATION
         ENABLE_ASSERTS
-        ENABLE_DEBUGGER_SUPPORT
         #ENABLE_RUNTIME_DEBUG_MESSAGES
     )
+    target_compile_options(dynautic PRIVATE -fsanitize=undefined)
+else()
+    target_compile_options(dynautic PRIVATE -fsanitize=bounds,null,return,unreachable)
 endif()
 
 install(TARGETS dynautic
