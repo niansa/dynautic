@@ -5,7 +5,7 @@ project(dynautic LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(LLVM 17 REQUIRED)
+find_package(LLVM 19.1.7 REQUIRED)
 separate_arguments(LLVM_DEFINITIONS)
 
 set(CAPSTONE_BUILD_TESTS OFF)
@@ -38,11 +38,11 @@ add_library(dynautic STATIC
 )
 target_include_directories(dynautic PRIVATE ${LLVM_INCLUDE_DIRS} PUBLIC include)
 target_compile_definitions(dynautic PRIVATE ${LLVM_DEFINITIONS})
-target_link_libraries(dynautic PRIVATE capstone)
+target_link_libraries(dynautic PRIVATE capstone ubsan)
 target_precompile_headers(dynautic PRIVATE src/llvm.hpp)
 target_compile_options(dynautic PRIVATE -fno-exceptions -funwind-tables)
 llvm_config(dynautic USE_SHARED core executionengine orcjit nativecodegen)
-target_compile_options(dynautic PRIVATE -Wno-error=cast-qual -Wno-error=implicit-fallthrough -Wno-string-conversion -Wno-sign-conversion)
+target_compile_options(dynautic PRIVATE -Wno-error=cast-qual -Wno-error=implicit-fallthrough -Wno-string-conversion -Wno-sign-conversion -fsanitize=bounds,null,return,unreachable)
 
 if (CMAKE_BUILD_TYPE MATCHES "^Deb")
     target_compile_definitions(dynautic PRIVATE
