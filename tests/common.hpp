@@ -42,7 +42,7 @@ public:
         std::fill(memory.begin()+exit_addr, memory.begin()+exit_addr+16, 0);
         std::fill(expected_memory.begin()+exit_addr, expected_memory.begin()+exit_addr+16, 0);
         if (memory != expected_memory) {
-            std::cerr << "Memory mismatch! Dumping and exiting...\n" << std::endl;
+            std::cerr << "Memory mismatch for test \"" << test_name << "\"! Dumping and exiting...\n" << std::endl;
             std::ofstream f1("memory.bin", std::ios::binary);
             std::ofstream f2("memory_expected.bin", std::ios::binary);
             f1.write(reinterpret_cast<const char*>(memory.data()), memory.size());

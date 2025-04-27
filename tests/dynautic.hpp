@@ -124,9 +124,41 @@ class TestDynautic final : public TestBase {
 public:
     TestDynautic() {
         user_config.callbacks = &env;
-        user_config.check_halt_on_memory_access = false;
-        //user_config.llvm_opt_level = Dynautic::LLVMOptimizationLevel::O0;
+        // user_config.llvm_opt_level = Dynautic::LLVMOptimizationLevel::O0;
         mmap(reinterpret_cast<void*>(exe_base), 1024*1024/*1 MB*/, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_FIXED_NOREPLACE, -1, 0);
+    }
+
+    void updateConfig(unsigned run) {
+        switch (run) {
+        case 0: {
+            user_config.update_cache = false;
+            user_config.fully_static = false;
+            user_config.periodic_recompile = 0;
+            user_config.native_memory = false;
+            user_config.unsafe_optimizations = false;
+        } break;
+        case 1: {
+            user_config.update_cache = true;
+            user_config.fully_static = false;
+            user_config.periodic_recompile = 100;
+            user_config.native_memory = false;
+            user_config.unsafe_optimizations = false;
+        } break;
+        case 2: {
+            user_config.update_cache = false;
+            user_config.fully_static = true;
+            user_config.periodic_recompile = 0;
+            user_config.native_memory = false;
+            user_config.unsafe_optimizations = true;
+        } break;
+        case 3: {
+            user_config.update_cache = false;
+            user_config.fully_static = true;
+            user_config.periodic_recompile = 0;
+            user_config.native_memory = true;
+            user_config.unsafe_optimizations = true;
+        } break;
+        }
     }
 
     uint64_t RunTest(std::vector<u32>&& instructions, std::array<u8, TestBase::mem_size>& memory, bool no_native_memory) override {
@@ -134,32 +166,33 @@ public:
         std::vector<u64> cache;
 
         // Run twice to test caching
-        for (unsigned run = 0; run != (no_native_memory?2:3); ++run) {
+        for (unsigned run = 0; run != (no_native_memory ? 3 : 4); ++run) {
             env.memory.fill(0);
 
             // Configure
-            user_config.update_cache = !(user_config.use_cache = user_config.unsafe_optimizations = user_config.fully_static = !cache.empty());
-            user_config.native_memory = run == 2;
-            //user_config.dump_assembly = user_config.native_memory;
+            updateConfig(run);
+            // user_config.dump_assembly = true;
 
             // Create runtime
             Dynautic::A64::Runtime cpu(user_config);
             env.cpu = &cpu;
 
             // Restore
-            if (!cache.empty())
+            if (!cache.empty() && user_config.use_cache) {
                 cpu.LoadCache(cache);
+                std::cout << "Using " << cache.size() << " bytes of cache data for next pass." << std::endl;
+            }
 
             // Write exit SVC instruction
-            env.MemoryWrite32(exit_addr, 0xd4000081); // svc #4
-            env.MemoryWrite32(exit_addr+4, 0xd65f03c0); // ret
+            env.MemoryWrite32(exit_addr, 0xd4000081);     // svc #4
+            env.MemoryWrite32(exit_addr + 4, 0xd65f03c0); // ret
 
             // Copy instructions to memory
             for (unsigned addr = exe_base, idx = 0; idx != instructions.size(); addr += 4, ++idx) {
                 env.MemoryWrite32(addr, instructions[idx]);
             }
             if (user_config.native_memory)
-                memcpy(reinterpret_cast<void*>(exe_base), instructions.data(), instructions.size()*4);
+                memcpy(reinterpret_cast<void *>(exe_base), instructions.data(), instructions.size() * 4);
 
             // Set up heap and stack
             Dynautic::A64::VAddr stack_addr = this->stack_addr;
@@ -182,18 +215,26 @@ public:
 
             // Execute
             common::Timer timer;
-            restart:
+        restart:
             const auto halt_reason = cpu.Run();
             switch (halt_reason) {
-            case Dynautic::HaltReason::UserDefined4: break;
-            case Dynautic::HaltReason::UserDefined3: cpu.SetPC(cpu.GetPC()+4); goto restart;
-            default: throw std::runtime_error("Dynautic error: Unexpected halt reasons: "+std::to_string(static_cast<uint32_t>(halt_reason)));
+            case Dynautic::HaltReason::UserDefined4:
+                break;
+            case Dynautic::HaltReason::UserDefined3:
+                throw std::runtime_error("Bad instruction encountered at " + std::to_string(cpu.GetPC()));
+            case Dynautic::HaltReason::JITInvalidation:
+                std::cout << "Reoptimizing with " << cpu.DumpCache().size() << " bytes of cache data\n";
+                goto restart;
+            default:
+                throw std::runtime_error("Dynautic error: Unexpected halt reasons (" + std::to_string(static_cast<uint32_t>(halt_reason)) + ") at " +
+                                         std::to_string(cpu.GetPC()));
             }
             const auto duration = timer.get();
 
             // Save cache
-            if (cache.empty())
-                cache = cpu.DumpCache();
+            auto newCache = cpu.DumpCache();
+            if (newCache.size() > cache.size())
+                cache = std::move(newCache);
 
             // Get result
             if (run == 0)
