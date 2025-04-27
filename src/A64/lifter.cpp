@@ -41,12 +41,13 @@ FunctionCallee Lifter::GetLiftedFunction(Instance& rinst, VAddr addr) {
 }
 
 std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
-    DYNAUTIC_ASSERT(IsOk() && rt.jit);
-
     // Skip if entry already compiled
     for (const auto& [that_addr, entry] : entries)
         if (that_addr == addr)
             return entry;
+
+    // Go on generating new code if everything looks alright
+    DYNAUTIC_ASSERT(IsOk() && rt.jit);
 
     // Enqueue address
     queued_functions.emplace(addr);
@@ -88,6 +89,8 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
                 CreateDebugPrintTrampoline(rinst, "Branch completed");
                 LiftLeaf(rinst, rinst.pc);
                 // Ensure branch context has been synced up properly
+                if (rt_values.dirty)
+                    outs() << *module;
                 DYNAUTIC_ASSERT(!rt_values.dirty);
             } else {
                 CreateDebugPrintTrampoline(rinst, "Dynamic branch happening...");
@@ -107,7 +110,10 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
 
     // Create entry function
     Instance rinst(rt, context.get(), module.get(), entry_fnc_name);
+    rinst.pc = addr;
     rinst.UseBasicBlock(rinst.CreateBasicBlock("EntryBlock"));
+    if (rt.conf.periodic_recompile)
+        CreateResetJITForPeriodicRecompileTrampolineTrampoline(rinst);
     UndirtyFunctionContext();
     LoadFunctionContext(rinst, true, true);
     CreateCall(rinst, static_cast<VAddr>(-1), addr);
@@ -140,9 +146,14 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
     // Insert list of processed functions into list of compiled functions
     compiled_functions.insert(compiled_functions.end(), processed_fncs.begin(), processed_fncs.end());
 
-    // Look up added function, add it to list and return address
+    // Look up added function, add it to list
     const auto fres = rt.jit->lookup(entry_fnc_name).get();
     entries.emplace(addr, fres);
+
+    // Reset last compile timer
+    rt.lastCompile.reset();
+
+    // Return address of generated function
     return fres;
 }
 

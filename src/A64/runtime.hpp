@@ -2,6 +2,7 @@
 
 #include "lifter.hpp"
 #include "cache.hpp"
+#include "../timer.hpp"
 #include "../globalmonitor.hpp"
 #include "../llvm.hpp"
 
@@ -53,9 +54,10 @@ struct Runtime::Impl {
     HaltReason halt_reason;
     VAddr pc;
 
-    Lifter raiser;
+    Lifter lifter;
     UserConfig conf;
     Cache cache;
+    Timer lastCompile;
 
     std::unique_ptr<llvm::orc::LLJIT> jit;
 
@@ -71,11 +73,20 @@ struct Runtime::Impl {
     /// Create new globals. Called by CreateJit(). Updates IsOk() state.
     void CreateGlobals();
 
+    /// Dump CPU state from globals.
+    StateDump DumpState();
+
+    /// Restore CPU state into globals.
+    void RestoreState(const StateDump&);
+
     /// Periodically called from generated code, may yield execution.
-    void UpdateExecutionState();
+    void CheckHalt();
 
     /// Clear caches.
     void ClearCache();
+
+    /// Clear JIT
+    void ClearJIT();
 
     static std::uint8_t MemoryRead8(Runtime::Impl&, VAddr vaddr);
     static std::uint16_t MemoryRead16(Runtime::Impl&, VAddr vaddr);

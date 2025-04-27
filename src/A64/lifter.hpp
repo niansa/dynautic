@@ -83,6 +83,7 @@ class Lifter {
 
     struct RuntimeValues {
         bool dirty{};
+
         std::array<llvm::Value *, 4> scratch_registers;
         std::array<llvm::Value *, 31> registers;
         std::array<bool, 31> dirty_registers{};
@@ -97,6 +98,16 @@ class Lifter {
         llvm::Value *exclusive_monitor{};
 
         llvm::Value *temp;
+
+        bool FullyClean() const {
+            bool fres = false;
+            for (const bool dirty : dirty_registers)
+                fres = fres || dirty;
+            for (const bool dirty : dirty_vectors)
+                fres = fres || dirty;
+            fres = fres || dirty_stack_pointer || dirty_comparison || dirty_nzcv;
+            return !fres;
+        }
     } rt_values, rt_allocas;
 
     void ResetScratchRegisters();
@@ -122,6 +133,8 @@ class Lifter {
     void FinalizeFunctionContext(Instance&, bool store_all = false);
     void UndirtyFunctionContext();
     void CreatePCSave(Instance&);
+    void CreateCheckHalt(Instance&);
+    void CreateResetJITForPeriodicRecompileTrampolineTrampoline(Instance&);
 
     static llvm::Value *CreateLoadFromGlobal(Instance& rinst, llvm::StringRef global_name, llvm::Type *type);
     static void CreateLoadFromGlobalIntoPtr(Instance& rinst, llvm::StringRef global_name, llvm::Type *type, llvm::Value *ptr);
@@ -157,7 +170,8 @@ class Lifter {
     static llvm::FunctionCallee GetLiftTrampoline(Instance&);
     static llvm::FunctionCallee GetSvcTrampoline(Instance&);
     static llvm::FunctionCallee GetExceptionTrampoline(Instance&);
-    static llvm::FunctionCallee GetUpdateExecutionStateTrampoline(Instance&);
+    static llvm::FunctionCallee GetCheckHaltTrampoline(Instance&);
+    static llvm::FunctionCallee GetResetJITForPeriodicRecompileTrampoline(Instance&);
     static llvm::FunctionCallee GetCreateDynamicBranchEntryTrampoline(Instance&);
     static llvm::FunctionCallee GetFreezeTrampoline(Instance&);
     static llvm::FunctionCallee GetExclusiveMonitorTagTrampoline(Instance&);
@@ -183,6 +197,13 @@ public:
 
     bool IsOk() const {
         return cs_handle != 0;
+    }
+
+    void Reset() {
+        while (!queued_functions.empty())
+            queued_functions.pop();
+        compiled_functions.clear();
+        entries.clear();
     }
 
     static void SetupTrampolines(llvm::orc::LLJIT&);

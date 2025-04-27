@@ -14,7 +14,10 @@
 namespace Dynautic::A64 {
 namespace {
 void LiftTrampoline(Lifter& self, VAddr addr) {
-    self.rt.UpdateExecutionState();
+#ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
+    std::cout << "Runtime debug message: Calling function at " << std::hex << addr << " via trampoline" << std::dec << std::endl;
+#endif
+    self.rt.CheckHalt();
     // This is the wrong signature, but still valid (hopefully). It's needed to enforce tail call optimization
     using Function = decltype(LiftTrampoline);
     Function *fnc;
@@ -32,19 +35,30 @@ void LiftTrampoline(Lifter& self, VAddr addr) {
 }
 
 void SvcTrampoline(Runtime::Impl& rt, uint32_t swi) {
-    rt.UpdateExecutionState();
+    rt.CheckHalt();
     rt.conf.callbacks->CallSVC(swi);
-    rt.UpdateExecutionState();
+    rt.CheckHalt();
 }
 
 void ExceptionTrampoline(Runtime::Impl& rt, VAddr pc, uint32_t exception) {
-    rt.UpdateExecutionState();
+    rt.CheckHalt();
     rt.conf.callbacks->ExceptionRaised(pc, static_cast<Exception>(exception));
-    rt.UpdateExecutionState();
+    rt.CheckHalt();
 }
 
-void UpdateExecutionStateTrampoline(Runtime::Impl& rt) {
-    rt.UpdateExecutionState();
+void CheckHaltTrampoline(Runtime::Impl& rt) { rt.CheckHalt(); }
+
+void ResetJITForPeriodicRecompileTrampoline(Runtime::Impl& rt) {
+#ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
+    std::cout << "Considering JIT reset after " << rt.lastCompile.get() << " ms..." << std::endl;
+#endif
+    if (rt.conf.periodic_recompile && rt.lastCompile.get() > rt.conf.periodic_recompile) {
+#ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
+        std::cout << "Resetting JIT for periodic recompile." << std::endl;
+#endif
+        rt.parent->HaltExecution(HaltReason::JITInvalidation);
+        rt.exc.Yield();
+    }
 }
 
 void CreateDynamicBranchEntryTrampoline(Cache& cache, VAddr origin, VAddr target) {
@@ -52,9 +66,12 @@ void CreateDynamicBranchEntryTrampoline(Cache& cache, VAddr origin, VAddr target
 }
 
 void FreezeTrampoline(Runtime::Impl& rt) {
+#ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
+    std::cout << "Freezing execution." << std::endl;
+#endif
     while (true) {
         std::this_thread::yield();
-        rt.UpdateExecutionState();
+        rt.CheckHalt();
     }
 }
 
@@ -77,7 +94,11 @@ bool ExclusiveMonitorIsPoisonedTrampoline(Runtime::Impl& rt, VAddr address) {
 
 #ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
 void DebugPrintTrampoline(const char *message, VAddr addr) {
-    std::cout << "Runtime debug message: " << message << " at 0x" << std::hex << addr << std::dec << std::endl;
+    std::cout << "Runtime debug message: " << message << " at ";
+    if (addr != 0xbad0bad0bad0bad0)
+        std::cout << "0x" << std::hex << addr << std::dec << '\n';
+    else
+        std::cout << "function entry\n";
 }
 #endif
 
@@ -145,73 +166,39 @@ void MemoryWrite128(Runtime::Impl& rt, VAddr addr, Vector value) {
 }
 
 void Lifter::SetupTrampolines(llvm::orc::LLJIT& jit) {
-    [[maybe_unused]] auto error = jit.getMainJITDylib().define(absoluteSymbols(llvm::orc::SymbolMap({
-        { jit.mangleAndIntern("MemoryRead8"),
-         { llvm::orc::ExecutorAddr::fromPtr(&MemoryRead8),
-          llvm::JITSymbolFlags::Callable } },
-        { jit.mangleAndIntern("MemoryRead16"),
-         { llvm::orc::ExecutorAddr::fromPtr(&MemoryRead16),
-          llvm::JITSymbolFlags::Callable } },
-        { jit.mangleAndIntern("MemoryRead32"),
-         { llvm::orc::ExecutorAddr::fromPtr(&MemoryRead32),
-          llvm::JITSymbolFlags::Callable } },
-        { jit.mangleAndIntern("MemoryRead64"),
-         { llvm::orc::ExecutorAddr::fromPtr(&MemoryRead64),
-          llvm::JITSymbolFlags::Callable } },
-        { jit.mangleAndIntern("MemoryRead128"),
-         { llvm::orc::ExecutorAddr::fromPtr(&MemoryRead128),
-          llvm::JITSymbolFlags::Callable } },
-        { jit.mangleAndIntern("MemoryWrite8"),
-         { llvm::orc::ExecutorAddr::fromPtr(&MemoryWrite8),
-          llvm::JITSymbolFlags::Callable } },
-        { jit.mangleAndIntern("MemoryWrite16"),
-         { llvm::orc::ExecutorAddr::fromPtr(&MemoryWrite16),
-          llvm::JITSymbolFlags::Callable } },
-        { jit.mangleAndIntern("MemoryWrite32"),
-         { llvm::orc::ExecutorAddr::fromPtr(&MemoryWrite32),
-          llvm::JITSymbolFlags::Callable } },
-        { jit.mangleAndIntern("MemoryWrite64"),
-         { llvm::orc::ExecutorAddr::fromPtr(&MemoryWrite64),
-          llvm::JITSymbolFlags::Callable } },
-        { jit.mangleAndIntern("MemoryWrite128"),
-         { llvm::orc::ExecutorAddr::fromPtr(&MemoryWrite128),
-          llvm::JITSymbolFlags::Callable } },
-        { jit.mangleAndIntern("LiftTrampoline"),
-         { llvm::orc::ExecutorAddr::fromPtr(&LiftTrampoline),
-          llvm::JITSymbolFlags::Callable } },
-        { jit.mangleAndIntern("SvcTrampoline"),
-         { llvm::orc::ExecutorAddr::fromPtr(&SvcTrampoline),
-          llvm::JITSymbolFlags::Callable } },
-        { jit.mangleAndIntern("ExceptionTrampoline"),
-         { llvm::orc::ExecutorAddr::fromPtr(&ExceptionTrampoline),
-          llvm::JITSymbolFlags::Callable } },
-        { jit.mangleAndIntern("UpdateExecutionStateTrampoline"),
-         { llvm::orc::ExecutorAddr::fromPtr(&UpdateExecutionStateTrampoline),
-          llvm::JITSymbolFlags::Callable } },
-        { jit.mangleAndIntern("CreateDynamicBranchEntryTrampoline"),
-         { llvm::orc::ExecutorAddr::fromPtr(&CreateDynamicBranchEntryTrampoline),
-          llvm::JITSymbolFlags::Callable } },
-        { jit.mangleAndIntern("FreezeTrampoline"),
-         { llvm::orc::ExecutorAddr::fromPtr(&FreezeTrampoline),
-          llvm::JITSymbolFlags::Callable } },
-        { jit.mangleAndIntern("ExclusiveMonitorTagTrampoline"),
-         { llvm::orc::ExecutorAddr::fromPtr(&ExclusiveMonitorTagTrampoline),
-          llvm::JITSymbolFlags::Callable } },
-        { jit.mangleAndIntern("ExclusiveMonitorUntagTrampoline"),
-         { llvm::orc::ExecutorAddr::fromPtr(&ExclusiveMonitorUntagTrampoline),
-          llvm::JITSymbolFlags::Callable } },
-        { jit.mangleAndIntern("ExclusiveMonitorPoisonTrampoline"),
-         { llvm::orc::ExecutorAddr::fromPtr(&ExclusiveMonitorPoisonTrampoline),
-          llvm::JITSymbolFlags::Callable } },
-        { jit.mangleAndIntern("ExclusiveMonitorIsPoisonedTrampoline"),
-         { llvm::orc::ExecutorAddr::fromPtr(&ExclusiveMonitorIsPoisonedTrampoline),
-          llvm::JITSymbolFlags::Callable } },
+    [[maybe_unused]]
+    auto error = jit.getMainJITDylib().define(absoluteSymbols(llvm::orc::SymbolMap(
+        {{jit.mangleAndIntern("MemoryRead8"), {llvm::orc::ExecutorAddr::fromPtr(&MemoryRead8), llvm::JITSymbolFlags::Callable}},
+         {jit.mangleAndIntern("MemoryRead16"), {llvm::orc::ExecutorAddr::fromPtr(&MemoryRead16), llvm::JITSymbolFlags::Callable}},
+         {jit.mangleAndIntern("MemoryRead32"), {llvm::orc::ExecutorAddr::fromPtr(&MemoryRead32), llvm::JITSymbolFlags::Callable}},
+         {jit.mangleAndIntern("MemoryRead64"), {llvm::orc::ExecutorAddr::fromPtr(&MemoryRead64), llvm::JITSymbolFlags::Callable}},
+         {jit.mangleAndIntern("MemoryRead128"), {llvm::orc::ExecutorAddr::fromPtr(&MemoryRead128), llvm::JITSymbolFlags::Callable}},
+         {jit.mangleAndIntern("MemoryWrite8"), {llvm::orc::ExecutorAddr::fromPtr(&MemoryWrite8), llvm::JITSymbolFlags::Callable}},
+         {jit.mangleAndIntern("MemoryWrite16"), {llvm::orc::ExecutorAddr::fromPtr(&MemoryWrite16), llvm::JITSymbolFlags::Callable}},
+         {jit.mangleAndIntern("MemoryWrite32"), {llvm::orc::ExecutorAddr::fromPtr(&MemoryWrite32), llvm::JITSymbolFlags::Callable}},
+         {jit.mangleAndIntern("MemoryWrite64"), {llvm::orc::ExecutorAddr::fromPtr(&MemoryWrite64), llvm::JITSymbolFlags::Callable}},
+         {jit.mangleAndIntern("MemoryWrite128"), {llvm::orc::ExecutorAddr::fromPtr(&MemoryWrite128), llvm::JITSymbolFlags::Callable}},
+         {jit.mangleAndIntern("LiftTrampoline"), {llvm::orc::ExecutorAddr::fromPtr(&LiftTrampoline), llvm::JITSymbolFlags::Callable}},
+         {jit.mangleAndIntern("SvcTrampoline"), {llvm::orc::ExecutorAddr::fromPtr(&SvcTrampoline), llvm::JITSymbolFlags::Callable}},
+         {jit.mangleAndIntern("ExceptionTrampoline"), {llvm::orc::ExecutorAddr::fromPtr(&ExceptionTrampoline), llvm::JITSymbolFlags::Callable}},
+         {jit.mangleAndIntern("CheckHaltTrampoline"), {llvm::orc::ExecutorAddr::fromPtr(&CheckHaltTrampoline), llvm::JITSymbolFlags::Callable}},
+         {jit.mangleAndIntern("ResetJITForPeriodicRecompileTrampoline"),
+          {llvm::orc::ExecutorAddr::fromPtr(&ResetJITForPeriodicRecompileTrampoline), llvm::JITSymbolFlags::Callable}},
+         {jit.mangleAndIntern("CreateDynamicBranchEntryTrampoline"),
+          {llvm::orc::ExecutorAddr::fromPtr(&CreateDynamicBranchEntryTrampoline), llvm::JITSymbolFlags::Callable}},
+         {jit.mangleAndIntern("FreezeTrampoline"), {llvm::orc::ExecutorAddr::fromPtr(&FreezeTrampoline), llvm::JITSymbolFlags::Callable}},
+         {jit.mangleAndIntern("ExclusiveMonitorTagTrampoline"),
+          {llvm::orc::ExecutorAddr::fromPtr(&ExclusiveMonitorTagTrampoline), llvm::JITSymbolFlags::Callable}},
+         {jit.mangleAndIntern("ExclusiveMonitorUntagTrampoline"),
+          {llvm::orc::ExecutorAddr::fromPtr(&ExclusiveMonitorUntagTrampoline), llvm::JITSymbolFlags::Callable}},
+         {jit.mangleAndIntern("ExclusiveMonitorPoisonTrampoline"),
+          {llvm::orc::ExecutorAddr::fromPtr(&ExclusiveMonitorPoisonTrampoline), llvm::JITSymbolFlags::Callable}},
+         {jit.mangleAndIntern("ExclusiveMonitorIsPoisonedTrampoline"),
+          {llvm::orc::ExecutorAddr::fromPtr(&ExclusiveMonitorIsPoisonedTrampoline), llvm::JITSymbolFlags::Callable}},
 #ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
-        { jit.mangleAndIntern("DebugPrintTrampoline"),
-         { llvm::orc::ExecutorAddr::fromPtr(&DebugPrintTrampoline),
-          llvm::JITSymbolFlags::Callable } }
+         {jit.mangleAndIntern("DebugPrintTrampoline"), {llvm::orc::ExecutorAddr::fromPtr(&DebugPrintTrampoline), llvm::JITSymbolFlags::Callable}}
 #endif
-    })));
+        })));
     DYNAUTIC_ASSERT(!error);
 }
 
@@ -285,9 +272,14 @@ llvm::FunctionCallee Lifter::GetExceptionTrampoline(Instance& rinst) {
     return rinst.module->getOrInsertFunction("ExceptionTrampoline", ftype);
 }
 
-llvm::FunctionCallee Lifter::GetUpdateExecutionStateTrampoline(Instance& rinst) {
+llvm::FunctionCallee Lifter::GetCheckHaltTrampoline(Instance& rinst) {
     const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy()}, false);
-    return rinst.module->getOrInsertFunction("UpdateExecutionStateTrampoline", ftype);
+    return rinst.module->getOrInsertFunction("CheckHaltTrampoline", ftype);
+}
+
+llvm::FunctionCallee Lifter::GetResetJITForPeriodicRecompileTrampoline(Instance& rinst) {
+    const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy()}, false);
+    return rinst.module->getOrInsertFunction("ResetJITForPeriodicRecompileTrampoline", ftype);
 }
 
 llvm::FunctionCallee Lifter::GetCreateDynamicBranchEntryTrampoline(Instance& rinst) {

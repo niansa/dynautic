@@ -186,11 +186,8 @@ bool Lifter::InstructionLifter::Run(bool first_instruction) {
     // Handle conditional predicates (except CSEL and CCMP)
     RuntimeValues rt_values_backup;
     BasicBlock *next_block = nullptr;
-    const bool conditional = detail.cc != AArch64CC_Invalid
-                             && insn.id != AArch64_INS_CSEL
-                             && insn.alias_id != AArch64_INS_ALIAS_CSET
-                             && insn.id != AArch64_INS_CCMN
-                             && insn.id != AArch64_INS_CCMP;
+    const bool conditional = detail.cc != AArch64CC_Invalid && insn.id != AArch64_INS_CSEL && insn.id != AArch64_INS_CCMN && insn.id != AArch64_INS_CCMP &&
+                             !(insn.is_alias && insn.alias_id == AArch64_INS_ALIAS_CSET);
     if (conditional) {
         Value *condition = GetCondition();
         if (!condition)

@@ -26,12 +26,11 @@ llvm::ArrayRef<Value *> Lifter::GetFunctionArgs() const {
 }
 
 void Lifter::LoadFunctionContext(Instance& rinst, bool new_allocas, bool load_all) {
-    rt_allocas.dirty = true;
-
     // Fill in stack pointer
     if (new_allocas)
         rt_allocas.stack_pointer = rinst.builder->CreateAlloca(rinst.GetIntType(64), nullptr, "alloca_sp_");
     CreateLoadFromGlobalIntoPtr(rinst, "stack_pointer", rinst.GetIntType(64), rt_allocas.stack_pointer);
+    rt_allocas.dirty_stack_pointer = true;
 
     // Fill in general purpose registers
     for (unsigned idx = 0; idx != rt_allocas.registers.size(); ++idx) {
@@ -41,6 +40,7 @@ void Lifter::LoadFunctionContext(Instance& rinst, bool new_allocas, bool load_al
             rinst.builder->CreateStore(dyn_cast<Value>(rinst.func->getArg(idx)), rt_allocas.registers[idx]);
         else
             CreateLoadFromGlobalIntoPtr(rinst, "general_register_"+std::to_string(idx), rinst.GetIntType(64), rt_allocas.registers[idx]);
+        rt_allocas.dirty_registers[idx] = true;
     }
 
     // Fill in vector registers
@@ -48,6 +48,7 @@ void Lifter::LoadFunctionContext(Instance& rinst, bool new_allocas, bool load_al
         if (new_allocas)
             rt_allocas.vectors[idx] = rinst.builder->CreateAlloca(rinst.GetIntType(128), nullptr, "alloca_q"+std::to_string(idx)+'_');
         CreateLoadFromGlobalIntoPtr(rinst, "vector_register_"+std::to_string(idx), rinst.GetIntType(128), rt_allocas.vectors[idx]);
+        rt_allocas.dirty_vectors[idx] = true;
     }
 
     // Fill in comparisation
@@ -57,11 +58,15 @@ void Lifter::LoadFunctionContext(Instance& rinst, bool new_allocas, bool load_al
     }
     CreateLoadFromGlobalIntoPtr(rinst, "comparison_first", rinst.GetIntType(64), rt_allocas.comparison.first);
     CreateLoadFromGlobalIntoPtr(rinst, "comparison_second", rinst.GetIntType(64), rt_allocas.comparison.second);
+    rt_allocas.dirty_comparison = true;
 
     // Fill in NZCV
     if (new_allocas)
         rt_allocas.nzcv = rinst.builder->CreateAlloca(rinst.GetIntType(8), nullptr, "alloca_nzcv_");
     CreateLoadFromGlobalIntoPtr(rinst, "nzcv", rinst.GetIntType(8), rt_allocas.nzcv);
+    rt_allocas.dirty_nzcv = true;
+
+    rt_allocas.dirty = true;
 
     // Allocate temp space
     rt_allocas.temp = rinst.builder->CreateAlloca(rinst.GetIntType(64), nullptr, "temp");
@@ -75,28 +80,37 @@ void Lifter::FinalizeFunctionContext(Instance& rinst, bool store_all) {
         FinalizeBranchContext(rinst);
 
     // Write out stack pointer
-    if (rt_allocas.dirty_stack_pointer)
+    if (rt_allocas.dirty_stack_pointer) {
         CreateStoreToGlobal(rinst, "stack_pointer", rinst.builder->CreateLoad(rinst.GetIntType(64), rt_allocas.stack_pointer));
+        rt_allocas.dirty_stack_pointer = false;
+    }
 
     // Write out general purpose registers
-    for (unsigned idx = store_all?0:ArchTraits::max_arg_count; idx != rt_allocas.registers.size(); ++idx)
-        if (rt_allocas.dirty_registers[idx] || (store_all && idx < ArchTraits::max_arg_count))
+    for (unsigned idx = store_all ? 0 : ArchTraits::max_arg_count; idx != rt_allocas.registers.size(); ++idx)
+        if (rt_allocas.dirty_registers[idx] || (store_all && idx < ArchTraits::max_arg_count)) {
             CreateStoreToGlobal(rinst, "general_register_"+std::to_string(idx), rinst.builder->CreateLoad(rinst.GetIntType(64), rt_allocas.registers[idx]));
+            rt_allocas.dirty_registers[idx] = false;
+        }
 
     // Write out vector registers
     for (unsigned idx = 0; idx != rt_allocas.vectors.size(); ++idx)
-        if (rt_allocas.dirty_vectors[idx])
+        if (rt_allocas.dirty_vectors[idx]) {
             CreateStoreToGlobal(rinst, "vector_register_"+std::to_string(idx), rinst.builder->CreateLoad(rinst.GetIntType(128), rt_allocas.vectors[idx]));
+            rt_allocas.dirty_vectors[idx] = false;
+        }
 
     // Write out comparisation
     if (rt_allocas.dirty_comparison) {
         CreateStoreToGlobal(rinst, "comparison_first", rinst.builder->CreateLoad(rinst.GetIntType(64), rt_allocas.comparison.first));
         CreateStoreToGlobal(rinst, "comparison_first", rinst.builder->CreateLoad(rinst.GetIntType(64), rt_allocas.comparison.second));
+        rt_allocas.dirty_comparison = false;
     }
 
     // Write out NZCV
-    if (rt_allocas.dirty_nzcv)
+    if (rt_allocas.dirty_nzcv) {
         CreateStoreToGlobal(rinst, "nzcv", rinst.builder->CreateLoad(rinst.GetIntType(8), rt_allocas.nzcv));
+        rt_allocas.dirty_nzcv = false;
+    }
 
     rt_allocas.dirty = false;
 }
@@ -111,25 +125,32 @@ void Lifter::UndirtyFunctionContext() {
 }
 
 void Lifter::LoadBranchContext(Instance& rinst) {
-    rt_values.dirty = true;
-
     // Fill in stack pointer
     rt_values.stack_pointer = rinst.builder->CreateLoad(rinst.GetIntType(64), rt_allocas.stack_pointer, "sp_");
+    rt_values.dirty_stack_pointer = true;
 
     // Fill in general purpose registers
-    for (unsigned idx = 0; idx != rt_values.registers.size(); ++idx)
+    for (unsigned idx = 0; idx != rt_values.registers.size(); ++idx) {
         rt_values.registers[idx] = rinst.builder->CreateLoad(rinst.GetIntType(64), rt_allocas.registers[idx], "x"+std::to_string(idx)+'_');
+        rt_values.dirty_registers[idx] = true;
+    }
 
     // Fill in vector registers
-    for (unsigned idx = 0; idx != rt_values.vectors.size(); ++idx)
-        rt_values.vectors[idx] = rinst.builder->CreateLoad(rinst.GetIntType(128), rt_allocas.vectors[idx], "q"+std::to_string(idx)+'_');
+    for (unsigned idx = 0; idx != rt_values.vectors.size(); ++idx) {
+        rt_values.vectors[idx] = rinst.builder->CreateLoad(rinst.GetIntType(128), rt_allocas.vectors[idx], "q" + std::to_string(idx) + '_');
+        rt_values.dirty_vectors[idx] = true;
+    }
 
     // Fill in comparisation
     rt_values.comparison.first = rinst.builder->CreateLoad(rinst.GetIntType(64), rt_allocas.comparison.first, "comp_first_");
     rt_values.comparison.second = rinst.builder->CreateLoad(rinst.GetIntType(64), rt_allocas.comparison.second, "comp_second_");
+    rt_values.dirty_comparison = true;
 
     // Fill in NZCV
     rt_values.nzcv = rinst.builder->CreateLoad(rinst.GetIntType(8), rt_allocas.nzcv, "nzcv_");
+    rt_values.dirty_nzcv = true;
+
+    rt_values.dirty = true;
 }
 void Lifter::FinalizeBranchContext(Instance& rinst) {
     // Untag any tagged memory
@@ -183,6 +204,19 @@ void Lifter::CreatePCSave(Instance& rinst) {
     CreateStoreToPtr(rinst, &rt.pc, rinst.CreateInt(64, rinst.pc+4));
 }
 
+void Lifter::CreateCheckHalt(Instance& rinst) {
+    Value *runtime = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
+    CreatePCSave(rinst);
+    rinst.builder->CreateCall(GetCheckHaltTrampoline(rinst), {runtime});
+}
+
+void Lifter::CreateResetJITForPeriodicRecompileTrampolineTrampoline(Instance& rinst) {
+    Value *runtime = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
+    DYNAUTIC_ASSERT(rt_values.FullyClean());
+    CreatePCSave(rinst);
+    rinst.builder->CreateCall(GetResetJITForPeriodicRecompileTrampoline(rinst), {runtime});
+}
+
 Value *Lifter::CreateLoadFromGlobal(Instance& rinst, llvm::StringRef global_name, llvm::Type *type) {
     return rinst.builder->CreateLoad(type, rinst.module->getOrInsertGlobal(global_name, type));
 }
@@ -207,7 +241,7 @@ Value *Lifter::CreateMemoryLoad(Instance& rinst, llvm::Value *address, Type *typ
     Value *runtime = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
     Value *fres = rinst.builder->CreateCall(GetMemoryRead(rinst, static_cast<uint8_t>(type->getIntegerBitWidth())), {runtime, address});
     if (rt.conf.check_halt_on_memory_access)
-        rinst.builder->CreateCall(GetUpdateExecutionStateTrampoline(rinst), {runtime});
+        CreateCheckHalt(rinst);
     return fres;
 }
 void Lifter::CreateMemoryStore(Instance& rinst, llvm::Value *address, llvm::Value *data, bool volatile_, uint8_t alignment) {
@@ -234,7 +268,7 @@ void Lifter::CreateMemoryStore(Instance& rinst, llvm::Value *address, llvm::Valu
     Value *runtime = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
     rinst.builder->CreateCall(GetMemoryWrite(rinst, static_cast<uint8_t>(data->getType()->getIntegerBitWidth())), {runtime, address, data});
     if (rt.conf.check_halt_on_memory_access)
-        rinst.builder->CreateCall(GetUpdateExecutionStateTrampoline(rinst), {runtime});
+        CreateCheckHalt(rinst);
 }
 
 void Lifter::CreateCall(Instance& rinst, VAddr origin, llvm::Value *address, bool no_cache) {
@@ -269,7 +303,7 @@ llvm::BasicBlock *Lifter::PrepareBranch(Instance& rinst, VAddr origin, Value *ad
     return block;
 }
 llvm::BasicBlock *Lifter::PrepareBranch(Instance& rinst, VAddr address) {
-    CreateDebugPrintTrampoline(rinst, "Preparing to branch... ");
+    CreateDebugPrintTrampoline(rinst, "Preparing to branch...");
 
     // Use dynamic branch if block linking is disabled
     if (!rt.conf.HasOptimization(OptimizationFlag::BlockLinking))
@@ -397,8 +431,7 @@ void Lifter::CreateExceptionTrampoline(Instance& rinst, Exception exception) {
     FinalizeFunctionContext(rinst, true);
     CreatePCSave(rinst);
     rinst.builder->CreateCall(GetExceptionTrampoline(rinst), {runtime, rinst.CreateInt(64, rinst.pc), rinst.CreateInt(32, static_cast<uint32_t>(exception))});
-    CreateLiftTrampoline(rinst, rinst.pc, rinst.CreateInt(64, rinst.pc));
-    LoadFunctionContext(rinst, false, true);
+    CreateLiftTrampoline(rinst, rinst.pc, rinst.CreateInt(64, rinst.pc), true);
 }
 
 void Lifter::CreateFreezeTrampoline(Instance& rinst) {

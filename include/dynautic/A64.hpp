@@ -179,6 +179,14 @@ struct UserConfig {
     /// Requires BlockLinking optimization.
     bool use_cache = true;
 
+    /// When set to non-zero, all generated code is dropped after given amount of
+    /// milliseconds of no code generation activity. This allows gradual optimization using
+    /// cached data as code execution happens.
+    /// This currently leads to regeneration and reoptimization of lots of previously
+    /// generated code which may introduce stutter.
+    /// This is useless without update_cache && use_cache
+    uint32_t periodic_recompile = 0;
+
     /// When set to true, no dynamic code generation is performed. This leads to optimal
     /// performance when using cache data, but will crash when executing any code that hasn't
     /// been cached and needs dynamic compilation.
@@ -239,6 +247,38 @@ struct UserConfig {
     bool very_verbose_debugging_output = false;
 };
 
+using RawStateDump = std::vector<uint8_t>;
+
+class StateDump {
+    static constexpr unsigned program_counter = 8, stack_pointer = 8, general_regs = 31 * 8, vector_regs = 32 * 16, comparison = 8 * 2, nzcv = 1;
+    static constexpr unsigned program_counter_off = 0, stack_pointer_off = program_counter_off + program_counter,
+                              general_regs_off = stack_pointer_off + stack_pointer, vector_regs_off = general_regs_off + general_regs,
+                              comparison_off = vector_regs_off + vector_regs, nzcv_off = comparison_off + comparison;
+    RawStateDump raw;
+
+public:
+    StateDump() : raw(nzcv_off + nzcv) {}
+    StateDump(const RawStateDump& o) : raw(o) {}
+    StateDump(RawStateDump&& o) : raw(std::move(o)) {}
+
+    uint64_t& GetProgramCounter() { return *reinterpret_cast<uint64_t *>(&raw[program_counter_off]); }
+    uint64_t& GetStackPointer() { return *reinterpret_cast<uint64_t *>(&raw[stack_pointer_off]); }
+    uint64_t *GetGeneralRegs() { return reinterpret_cast<uint64_t *>(&raw[general_regs_off]); }
+    Vector *GetVectorRegs() { return reinterpret_cast<Vector *>(&raw[vector_regs_off]); }
+    uint64_t *GetComparison() { return reinterpret_cast<uint64_t *>(&raw[comparison_off]); }
+    uint8_t& GetNZCV() { return *reinterpret_cast<uint8_t *>(&raw[nzcv_off]); }
+
+    uint64_t GetProgramCounter() const { return *reinterpret_cast<const uint64_t *>(&raw[program_counter_off]); }
+    uint64_t GetStackPointer() const { return *reinterpret_cast<const uint64_t *>(&raw[stack_pointer_off]); }
+    const uint64_t *GetGeneralRegs() const { return reinterpret_cast<const uint64_t *>(&raw[general_regs_off]); }
+    const Vector *GetVectorRegs() const { return reinterpret_cast<const Vector *>(&raw[vector_regs_off]); }
+    const uint64_t *GetComparison() const { return reinterpret_cast<const uint64_t *>(&raw[comparison_off]); }
+    uint8_t GetNZCV() const { return *reinterpret_cast<const uint8_t *>(&raw[nzcv_off]); }
+
+    const RawStateDump& GetRaw() const { return raw; }
+    RawStateDump&& MoveRaw() { return std::move(raw); }
+};
+
 class Runtime {
 public:
     explicit Runtime(UserConfig conf);
@@ -266,10 +306,18 @@ public:
     void Reset();
 
     /**
-     * Clears the code cache of all compiled code.
-     * Can be called at any time. Halts execution if called within a callback.
+     * Clears the code cache and all compiled code.
+     * Can be called at any time. Calling this within a callback will cause a halt after which the CPU state will be invalid!
+     * To prevent state invalidation, call outside callback.
      */
     void ClearCache();
+
+    /**
+     * Clears all compiled code.
+     * Can be called at any time. Calling this within a callback will cause a halt after which the CPU state will be invalid!
+     * To prevent state invalidation, call outside callback.
+     */
+    void ClearJIT();
 
     /**
      * Stops execution in Jit::Run.
@@ -281,6 +329,12 @@ public:
      * Warning: Only use this if you're sure this won't introduce races.
      */
     void ClearHalt(HaltReason hr = HaltReason::UserDefined1);
+
+    /// Dump all CPU state
+    StateDump DumpState();
+
+    /// Restore CPU state dump
+    void RestoreState(const StateDump&);
 
     /// Read Stack Pointer
     std::uint64_t GetSP() const;

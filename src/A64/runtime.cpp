@@ -6,6 +6,7 @@
 
 #include <iostream>
 #include <memory>
+#include <array>
 #include <dynautic/A64.hpp>
 #include <llvm/ExecutionEngine/Orc/TargetProcess/RegisterEHFrames.h>
 
@@ -62,9 +63,7 @@ public:
     }
 } g_LLVMInitSingleton;
 
-
-Runtime::Impl::Impl(UserConfig conf_, Runtime *parent)
-      : parent(parent), raiser(*this), conf(conf_) {
+Runtime::Impl::Impl(UserConfig conf_, Runtime *parent) : parent(parent), lifter(*this), conf(conf_) {
     // Enforce configuration restraints
     if (!conf.unsafe_optimizations) {
         conf.fully_static = false;
@@ -72,6 +71,9 @@ Runtime::Impl::Impl(UserConfig conf_, Runtime *parent)
     }
     conf.use_cache = conf.use_cache && conf.HasOptimization(OptimizationFlag::BlockLinking);
     conf.fully_static = conf.fully_static && conf.use_cache;
+    conf.update_cache = conf.update_cache && !conf.fully_static;
+    if (!(conf.update_cache && conf.use_cache))
+        conf.periodic_recompile = 0;
 
     // Create global monitor if not ignored
     if (!conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)) {
@@ -84,11 +86,7 @@ Runtime::Impl::Impl(UserConfig conf_, Runtime *parent)
 }
 
 void Runtime::Impl::CreateJit() {
-    auto expected_jit = llvm::orc::LLJITBuilder()
-#ifdef ENABLE_DEBUGGER_SUPPORT
-                            .setEnableDebuggerSupport(true)
-#endif
-                            .create();
+    auto expected_jit = llvm::orc::LLJITBuilder().create();
     if (!expected_jit) {
         jit = nullptr;
         llvm::errs() << "Failed to initialize JIT: " << expected_jit.takeError() << '\n';
@@ -137,7 +135,59 @@ void Runtime::Impl::CreateGlobals() {
     }
 }
 
-void Runtime::Impl::UpdateExecutionState() {
+StateDump Runtime::Impl::DumpState() {
+    StateDump fres;
+
+    fres.GetProgramCounter() = pc;
+
+    if (auto expected_address = jit->lookup("stack_pointer"))
+        fres.GetStackPointer() = *reinterpret_cast<uint64_t *>(expected_address->getValue());
+
+    for (unsigned idx = 0; idx != 31; idx++)
+        if (auto expected_address = jit->lookup("general_register_" + std::to_string(idx)))
+            fres.GetGeneralRegs()[idx] = *reinterpret_cast<std::uint64_t *>(expected_address->getValue());
+
+    for (unsigned idx = 0; idx != 32; idx++)
+        if (auto expected_address = jit->lookup("vector_register_" + std::to_string(idx)))
+            fres.GetVectorRegs()[idx] = *reinterpret_cast<Vector *>(expected_address->getValue());
+
+    if (auto expected_address = jit->lookup("comparison_first"))
+        fres.GetComparison()[0] = *reinterpret_cast<uint64_t *>(expected_address->getValue());
+    if (auto expected_address = jit->lookup("comparison_second"))
+        fres.GetComparison()[1] = *reinterpret_cast<uint64_t *>(expected_address->getValue());
+    if (auto expected_address = jit->lookup("nzcv"))
+        fres.GetNZCV() = *reinterpret_cast<uint8_t *>(expected_address->getValue());
+
+    return fres;
+}
+
+void Runtime::Impl::RestoreState(const StateDump& dump) {
+    const auto newPc = dump.GetProgramCounter();
+    if (newPc != pc) {
+        exc.Destroy();
+        pc = newPc;
+    }
+
+    if (auto expected_address = jit->lookup("stack_pointer"))
+        *reinterpret_cast<uint64_t *>(expected_address->getValue()) = dump.GetStackPointer();
+
+    for (unsigned idx = 0; idx != 31; idx++)
+        if (auto expected_address = jit->lookup("general_register_" + std::to_string(idx)))
+            *reinterpret_cast<std::uint64_t *>(expected_address->getValue()) = dump.GetGeneralRegs()[idx];
+
+    for (unsigned idx = 0; idx != 32; idx++)
+        if (auto expected_address = jit->lookup("vector_register_" + std::to_string(idx)))
+            *reinterpret_cast<Vector *>(expected_address->getValue()) = dump.GetVectorRegs()[idx];
+
+    if (auto expected_address = jit->lookup("comparison_first"))
+        *reinterpret_cast<uint64_t *>(expected_address->getValue()) = dump.GetComparison()[0];
+    if (auto expected_address = jit->lookup("comparison_second"))
+        *reinterpret_cast<uint64_t *>(expected_address->getValue()) = dump.GetComparison()[1];
+    if (auto expected_address = jit->lookup("nzcv"))
+        *reinterpret_cast<uint8_t *>(expected_address->getValue()) = dump.GetNZCV();
+}
+
+void Runtime::Impl::CheckHalt() {
     if (halt_reason != HaltReason::None)
         exc.Yield();
 }
@@ -148,55 +198,66 @@ void Runtime::Impl::ClearCache() {
         return;
     }
     cache.Reset();
+    ClearJIT();
+}
+
+void Runtime::Impl::ClearJIT() {
+    if (executing) {
+        parent->HaltExecution(HaltReason::JITInvalidation);
+        return;
+    }
+    const auto state = DumpState();
     exc.Destroy();
+    lifter.Reset();
     CreateJit();
+    RestoreState(state);
 }
 
 std::uint8_t Runtime::Impl::MemoryRead8(Runtime::Impl& self, VAddr vaddr) {
     const auto fres = self.conf.callbacks->MemoryRead8(vaddr);
-    self.UpdateExecutionState();
+    self.CheckHalt();
     return fres;
 }
 std::uint16_t Runtime::Impl::MemoryRead16(Runtime::Impl& self, VAddr vaddr) {
     const auto fres = self.conf.callbacks->MemoryRead16(vaddr);
-    self.UpdateExecutionState();
+    self.CheckHalt();
     return fres;
 }
 std::uint32_t Runtime::Impl::MemoryRead32(Runtime::Impl& self, VAddr vaddr) {
     const auto fres = self.conf.callbacks->MemoryRead32(vaddr);
-    self.UpdateExecutionState();
+    self.CheckHalt();
     return fres;
 }
 std::uint64_t Runtime::Impl::MemoryRead64(Runtime::Impl& self, VAddr vaddr) {
     const auto fres = self.conf.callbacks->MemoryRead64(vaddr);
-    self.UpdateExecutionState();
+    self.CheckHalt();
     return fres;
 }
 Vector Runtime::Impl::MemoryRead128(Runtime::Impl& self, VAddr vaddr) {
     const auto fres = self.conf.callbacks->MemoryRead128(vaddr);
-    self.UpdateExecutionState();
+    self.CheckHalt();
     return fres;
 }
 
 void Runtime::Impl::MemoryWrite8(Runtime::Impl& self, VAddr vaddr, std::uint8_t value) {
     self.conf.callbacks->MemoryWrite8(vaddr, value);
-    self.UpdateExecutionState();
+    self.CheckHalt();
 }
 void Runtime::Impl::MemoryWrite16(Runtime::Impl& self, VAddr vaddr, std::uint16_t value) {
     self.conf.callbacks->MemoryWrite16(vaddr, value);
-    self.UpdateExecutionState();
+    self.CheckHalt();
 }
 void Runtime::Impl::MemoryWrite32(Runtime::Impl& self, VAddr vaddr, std::uint32_t value) {
     self.conf.callbacks->MemoryWrite32(vaddr, value);
-    self.UpdateExecutionState();
+    self.CheckHalt();
 }
 void Runtime::Impl::MemoryWrite64(Runtime::Impl& self, VAddr vaddr, std::uint64_t value) {
     self.conf.callbacks->MemoryWrite64(vaddr, value);
-    self.UpdateExecutionState();
+    self.CheckHalt();
 }
 void Runtime::Impl::MemoryWrite128(Runtime::Impl& self, VAddr vaddr, Vector value) {
     self.conf.callbacks->MemoryWrite128(vaddr, value);
-    self.UpdateExecutionState();
+    self.CheckHalt();
 }
 
 
@@ -211,7 +272,7 @@ HaltReason Runtime::Run() {
     impl->executing = true;
     impl->halt_reason = HaltReason::None;
 
-    auto expected_addr = impl->raiser.Lift(impl->pc);
+    auto expected_addr = impl->lifter.Lift(impl->pc);
     if (!expected_addr) {
         impl->conf.callbacks->ExceptionRaised(impl->pc, Exception::UnpredictableInstruction); //TODO: Raise proper exception?
         return HaltReason::MemoryAbort;
@@ -225,6 +286,8 @@ HaltReason Runtime::Run() {
 
     if (Has(impl->halt_reason, HaltReason::CacheInvalidation))
         impl->ClearCache();
+    if (Has(impl->halt_reason, HaltReason::JITInvalidation))
+        impl->ClearJIT();
 
     return impl->halt_reason;
 }
@@ -244,13 +307,17 @@ void Runtime::ClearCache() {
     impl->ClearCache();
 }
 
-void Runtime::HaltExecution(HaltReason hr) {
-    impl->halt_reason |= hr;
-}
+void Runtime::ClearJIT() { impl->ClearJIT(); }
+
+void Runtime::HaltExecution(HaltReason hr) { impl->halt_reason |= hr; }
 
 void Runtime::ClearHalt(HaltReason hr) {
     impl->halt_reason &= ~hr;
 }
+
+StateDump Runtime::DumpState() { return impl->DumpState(); }
+
+void Runtime::RestoreState(const StateDump& dump) { impl->RestoreState(dump); }
 
 std::uint64_t Runtime::GetSP() const {
     if (auto expected_address = impl->jit->lookup("stack_pointer"))
