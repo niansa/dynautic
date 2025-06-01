@@ -59,7 +59,7 @@ public:
         block_terminated = false; // Assume new block hasn't been terminated yet
     }
 
-    llvm::FunctionCallee DeclareFunction(llvm::StringRef name);
+    llvm::Function *CreateFunction(llvm::StringRef name, llvm::Function::LinkageTypes linkage);
 
     bool NextBranch();
 

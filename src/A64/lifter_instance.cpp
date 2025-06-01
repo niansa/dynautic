@@ -14,15 +14,20 @@ llvm::ArrayRef<Type *> Lifter::Instance::GetFunctionArgTypes() const {
 
 Lifter::Instance::Instance(Runtime::Impl& runtime, llvm::LLVMContext *context, llvm::Module *module, const std::string& function_name)
     : rt(runtime), context(context), module(module) {
-    // Try to get function first, if that fails, create
+    // Try to get function first, if that fails, create it
     if (!(func = module->getFunction(function_name))) {
-        func = Function::Create(FunctionType::get(Type::getVoidTy(*context), GetFunctionArgTypes(), false), Function::ExternalLinkage, function_name, *module);
+        func = CreateFunction(function_name, Function::ExternalLinkage);
     }
-    func->setCallingConv(CallingConv::Tail);
 }
 
-llvm::FunctionCallee Lifter::Instance::DeclareFunction(llvm::StringRef name) {
-    return module->getOrInsertFunction(name, FunctionType::get(Type::getVoidTy(*context), GetFunctionArgTypes(), false));
+llvm::Function *Lifter::Instance::CreateFunction(llvm::StringRef name, GlobalValue::LinkageTypes linkage) {
+    llvm::Function *fres = module->getFunction(name);
+    if (fres)
+        return fres;
+
+    fres = Function::Create(FunctionType::get(Type::getVoidTy(*context), GetFunctionArgTypes(), false), linkage, name, *module);
+    fres->setCallingConv(CallingConv::Tail);
+    return fres;
 }
 
 bool Lifter::Instance::NextBranch() {

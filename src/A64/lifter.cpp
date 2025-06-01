@@ -32,7 +32,7 @@ Lifter::~Lifter() {
 
 std::string Lifter::GetFunctionName(VAddr addr) { return "FncAt" + std::to_string(addr); }
 
-FunctionCallee Lifter::GetLiftedFunction(Instance& rinst, VAddr addr) { return rinst.DeclareFunction(GetFunctionName(addr)); }
+FunctionCallee Lifter::GetLiftedFunction(Instance& rinst, VAddr addr) { return rinst.CreateFunction(GetFunctionName(addr), llvm::Function::ExternalLinkage); }
 
 std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
     // Skip if entry already compiled
