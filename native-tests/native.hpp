@@ -2,10 +2,8 @@
 #define NATIVE_HPP
 #include "common.hpp"
 
-#include <stdexcept>
 #include <dynautic/A64.hpp>
-
-
+#include <stdexcept>
 
 class TestNative final : public TestBase {
 public:

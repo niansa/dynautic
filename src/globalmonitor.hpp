@@ -1,12 +1,11 @@
 #ifndef DYNAUTIC_A64_GLOBALMONITOR_HPP
 #define DYNAUTIC_A64_GLOBALMONITOR_HPP
-#include <unordered_map>
+#include <csignal>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <thread>
-#include <cstdint>
-#include <csignal>
-
+#include <unordered_map>
 
 namespace Dynautic {
 using Addr = uint64_t;
@@ -29,8 +28,7 @@ class GlobalMonitor {
         std::mutex conditional_mutex{};
         std::condition_variable conditional_lock{};
 
-        Tag(size_t processor_id)
-              : processor_id(processor_id), thread_id(std::this_thread::get_id()) {}
+        Tag(size_t processor_id) : processor_id(processor_id), thread_id(std::this_thread::get_id()) {}
     };
 
     std::unordered_map<Addr, Tag> tags;

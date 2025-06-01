@@ -9,12 +9,12 @@
 #include "common.hpp"
 #include "optimization.hpp"
 
-#include <string>
-#include <vector>
-#include <optional>
-#include <memory>
 #include <array>
 #include <cstdint>
+#include <memory>
+#include <optional>
+#include <string>
+#include <vector>
 
 namespace Dynautic::A64 {
 using VAddr = std::uint64_t;
@@ -23,27 +23,36 @@ using Vector = std::array<std::uint64_t, 2>;
 static_assert(sizeof(Vector) == sizeof(std::uint64_t) * 2, "Vector must be 128 bits in size");
 
 enum class Exception {
-    /// An UndefinedFault occured due to executing instruction with an unallocated encoding
+    /// An UndefinedFault occured due to executing instruction with an unallocated
+    /// encoding
     UnallocatedEncoding,
-    /// An UndefinedFault occured due to executing instruction containing a reserved value
+    /// An UndefinedFault occured due to executing instruction containing a
+    /// reserved value
     ReservedValue,
-    /// An unpredictable instruction is to be executed. Implementation-defined behaviour should now happen.
+    /// An unpredictable instruction is to be executed. Implementation-defined
+    /// behaviour should now happen.
     /// This behaviour is up to the user of this library to define.
-    /// Note: Constraints on unpredictable behaviour are specified in the ARMv8 ARM.
+    /// Note: Constraints on unpredictable behaviour are specified in the ARMv8
+    /// ARM.
     UnpredictableInstruction,
-    /// A WFI instruction was executed. You may now enter a low-power state. (Hint instruction.)
+    /// A WFI instruction was executed. You may now enter a low-power state. (Hint
+    /// instruction.)
     WaitForInterrupt,
-    /// A WFE instruction was executed. You may now enter a low-power state if the event register is clear. (Hint instruction.)
+    /// A WFE instruction was executed. You may now enter a low-power state if the
+    /// event register is clear. (Hint instruction.)
     WaitForEvent,
-    /// A SEV instruction was executed. The event register of all PEs should be set. (Hint instruction.)
+    /// A SEV instruction was executed. The event register of all PEs should be
+    /// set. (Hint instruction.)
     SendEvent,
-    /// A SEVL instruction was executed. The event register of the current PE should be set. (Hint instruction.)
+    /// A SEVL instruction was executed. The event register of the current PE
+    /// should be set. (Hint instruction.)
     SendEventLocal,
     /// A YIELD instruction was executed. (Hint instruction.)
     Yield,
     /// A BRK instruction was executed. (Hint instruction.)
     Breakpoint,
-    /// Attempted to execute a code block at an address for which MemoryReadCode returned std::nullopt.
+    /// Attempted to execute a code block at an address for which MemoryReadCode
+    /// returned std::nullopt.
     /// (Intended to be used to emulate memory protection faults.)
     NoExecuteFault,
 };
@@ -90,10 +99,10 @@ struct UserCallbacks {
     virtual void MemoryWrite64(VAddr vaddr, std::uint64_t value) = 0;
     virtual void MemoryWrite128(VAddr vaddr, Vector value) = 0;
 
-    /// If this callback returns true, the JIT will assume MemoryRead* callbacks will always
-    /// return the same value at any point in time for this vaddr. The JIT may use this information
-    /// in optimizations.
-    /// A conservative implementation that always returns false is safe.
+    /// If this callback returns true, the JIT will assume MemoryRead* callbacks
+    /// will always return the same value at any point in time for this vaddr. The
+    /// JIT may use this information in optimizations. A conservative
+    /// implementation that always returns false is safe.
     virtual bool IsReadOnlyMemory(VAddr /*vaddr*/) { return false; }
 
     /// The interpreter must execute exactly num_instructions starting from PC.
@@ -115,99 +124,100 @@ struct UserCallbacks {
 };
 
 struct UserConfig {
-    UserCallbacks* callbacks;
+    UserCallbacks *callbacks;
 
-    /// All instances operating together in a multithreaded scenario sharing the a memory
-    /// space must have the same system_id.
-    /// system_ids should count up from 0.
+    /// All instances operating together in a multithreaded scenario sharing the a
+    /// memory space must have the same system_id. system_ids should count up from
+    /// 0.
     uint8_t system_id = 0;
 
     size_t processor_id = 0;
 
-    /// This selects other optimizations than can't otherwise be disabled by setting other
-    /// configuration options.
-    /// This is intended to be used for debugging.
+    /// This selects other optimizations than can't otherwise be disabled by
+    /// setting other configuration options. This is intended to be used for
+    /// debugging.
     OptimizationFlag optimizations = all_safe_optimizations;
 
-    bool HasOptimization(OptimizationFlag f) const {
-        return (f & optimizations) != no_optimizations;
-    }
+    bool HasOptimization(OptimizationFlag f) const { return (f & optimizations) != no_optimizations; }
 
-    /// This enables unsafe optimizations that reduce emulation accuracy in favour of speed.
-    /// For safety, in order to enable unsafe optimizations you have to set BOTH this flag
-    /// AND the appropriate flag bits above.
-    /// The prefered and tested mode for this library is with unsafe optimizations disabled.
+    /// This enables unsafe optimizations that reduce emulation accuracy in favour
+    /// of speed. For safety, in order to enable unsafe optimizations you have to
+    /// set BOTH this flag AND the appropriate flag bits above. The prefered and
+    /// tested mode for this library is with unsafe optimizations disabled.
     bool unsafe_optimizations = false;
 
-    /// This configured the optimization level LLVM optimizes generated code at. The higher
-    /// the optimization level, the longer the time recompilation takes but the faster the
-    /// generate code.
-    /// This pretty much corresponds to optimization levels used when compiling C or C++
-    /// code, and O2 is usually a good middle-ground between compilation time and runtime
-    /// speed.
-    /// Os optimizes more for low code size (thus lower memory usage) while Oz
+    /// This configured the optimization level LLVM optimizes generated code at.
+    /// The higher the optimization level, the longer the time recompilation takes
+    /// but the faster the generate code. This pretty much corresponds to
+    /// optimization levels used when compiling C or C++ code, and O2 is usually a
+    /// good middle-ground between compilation time and runtime speed. Os
+    /// optimizes more for low code size (thus lower memory usage) while Oz
     /// attempts to achieve low code size at all costs.
-    /// Disabling the LLVMIROpt optimization flag causes this option to be ignored.
+    /// Disabling the LLVMIROpt optimization flag causes this option to be
+    /// ignored.
     LLVMOptimizationLevel llvm_opt_level = LLVMOptimizationLevel::O2;
 
-    /// When set to true, Dynautic will attempt to continue in unexpected situations (mostly
-    /// those created by unsafe optimizations or incorrect imlementation) instead of raising
-    /// an UnpredictableInstruction exception. Assertions may still trigger if enabled.
+    /// When set to true, Dynautic will attempt to continue in unexpected
+    /// situations (mostly those created by unsafe optimizations or incorrect
+    /// imlementation) instead of raising an UnpredictableInstruction exception.
+    /// Assertions may still trigger if enabled.
     bool unsafe_unexpected_situation_handling = false;
 
-    /// When set to true, no memory access callbacks other than MemoryReadCode are called.
-    /// Instead, memory accesses are translated to native memory accesses. Note that this
-    /// allows the emulated code to hijack the rest of the application.
-    /// Note that if this is enabled it is up to the operating system to handle access
-    /// faults. The application is responsible for setting up handlers indepdently.
+    /// When set to true, no memory access callbacks other than MemoryReadCode are
+    /// called. Instead, memory accesses are translated to native memory accesses.
+    /// Note that this allows the emulated code to hijack the rest of the
+    /// application. Note that if this is enabled it is up to the operating system
+    /// to handle access faults. The application is responsible for setting up
+    /// handlers indepdently.
     bool native_memory = false;
 
-    /// When set to true, UserCallbacks::DataCacheOperationRaised will be called when any
-    /// data cache instruction is executed. Notably DC ZVA will not implicitly do anything.
-    /// When set to false, UserCallbacks::DataCacheOperationRaised will never be called.
-    /// Executing DC ZVA in this mode will result in zeros being written to memory.
+    /// When set to true, UserCallbacks::DataCacheOperationRaised will be called
+    /// when any data cache instruction is executed. Notably DC ZVA will not
+    /// implicitly do anything. When set to false,
+    /// UserCallbacks::DataCacheOperationRaised will never be called. Executing DC
+    /// ZVA in this mode will result in zeros being written to memory.
     bool hook_data_cache_operations = false;
 
-    /// When set to true, cache will be updated. This will decrease performance at the cost
-    /// of generating cache entries that may be used for performance increases with use_cache
-    /// enabled later on.
+    /// When set to true, cache will be updated. This will decrease performance at
+    /// the cost of generating cache entries that may be used for performance
+    /// increases with use_cache enabled later on.
     bool update_cache = false;
 
-    /// When set to true, cache will be used to generate more optimized code. This is only
-    /// useful when cache entries previously generated with update_cache enabled are loaded.
-    /// Note this will make initial compilation slow but happen much less frequently.
-    /// Requires BlockLinking optimization.
+    /// When set to true, cache will be used to generate more optimized code. This
+    /// is only useful when cache entries previously generated with update_cache
+    /// enabled are loaded. Note this will make initial compilation slow but
+    /// happen much less frequently. Requires BlockLinking optimization.
     bool use_cache = true;
 
     /// When set to non-zero, all generated code is dropped after given amount of
-    /// milliseconds of no code generation activity. This allows gradual optimization using
-    /// cached data as code execution happens.
-    /// This currently leads to regeneration and reoptimization of lots of previously
-    /// generated code which may introduce stutter.
-    /// This is useless without update_cache && use_cache
+    /// milliseconds of no code generation activity. This allows gradual
+    /// optimization using cached data as code execution happens. This currently
+    /// leads to regeneration and reoptimization of lots of previously generated
+    /// code which may introduce stutter. This is useless without update_cache &&
+    /// use_cache
     uint32_t periodic_recompile = 0;
 
-    /// When set to true, no dynamic code generation is performed. This leads to optimal
-    /// performance when using cache data, but will crash when executing any code that hasn't
-    /// been cached and needs dynamic compilation.
-    /// Requires unsafe_optimizations and use_cache.
+    /// When set to true, no dynamic code generation is performed. This leads to
+    /// optimal performance when using cache data, but will crash when executing
+    /// any code that hasn't been cached and needs dynamic compilation. Requires
+    /// unsafe_optimizations and use_cache.
     bool fully_static = false;
 
-    /// When set to true, UserCallbacks::InstructionSynchronizationBarrierRaised will be
-    /// called when an ISB instruction is executed.
-    /// When set to false, ISB will be treated as a NOP instruction.
+    /// When set to true, UserCallbacks::InstructionSynchronizationBarrierRaised
+    /// will be called when an ISB instruction is executed. When set to false, ISB
+    /// will be treated as a NOP instruction.
     bool hook_isb = false;
 
-    /// When set to true, UserCallbacks::ExceptionRaised will be called when any hint
-    /// instruction is executed.
+    /// When set to true, UserCallbacks::ExceptionRaised will be called when any
+    /// hint instruction is executed.
     bool hook_hint_instructions = false;
 
-    /// When set to true, any generated assembly is dumped to console. This is useful for
-    /// debugging purposes only.
+    /// When set to true, any generated assembly is dumped to console. This is
+    /// useful for debugging purposes only.
     bool dump_assembly = false;
 
-    /// Counter-timer frequency register. The value of the register is not interpreted by
-    /// Dynautic.
+    /// Counter-timer frequency register. The value of the register is not
+    /// interpreted by Dynautic.
     std::uint32_t cntfrq_el0 = 600000000;
 
     /// CTR_EL0<27:24> is log2 of the cache writeback granule in words.
@@ -223,24 +233,25 @@ struct UserConfig {
 
     /// Pointer to where TPIDRRO_EL0 is stored. This pointer will be inserted into
     /// emitted code.
-    const std::uint64_t* tpidrro_el0 = nullptr;
+    const std::uint64_t *tpidrro_el0 = nullptr;
 
     /// Pointer to where TPIDR_EL0 is stored. This pointer will be inserted into
     /// emitted code.
-    std::uint64_t* tpidr_el0 = nullptr;
+    std::uint64_t *tpidr_el0 = nullptr;
 
     /// HACK:
     /// This tells the translator a wall clock will be used, thus allowing it
     /// to avoid writting certain unnecessary code only needed for cycle timers.
     bool wall_clock_cntpct = false;
 
-    /// This allows accurately emulating protection fault handlers. If true, we check
-    /// for exit after every data memory access by the emulated program.
+    /// This allows accurately emulating protection fault handlers. If true, we
+    /// check for exit after every data memory access by the emulated program.
     /// Useless if combined with native_memory.
     bool check_halt_on_memory_access = false;
 
     /// This option allows you to disable cycle counting. If this is set to false,
-    /// AddTicks and GetTicksRemaining are never called, and no cycle counting is done.
+    /// AddTicks and GetTicksRemaining are never called, and no cycle counting is
+    /// done.
     bool enable_cycle_counting = true;
 
     /// Internal use only
@@ -307,15 +318,17 @@ public:
 
     /**
      * Clears the code cache and all compiled code.
-     * Can be called at any time. Calling this within a callback will cause a halt after which the CPU state will be invalid!
-     * To prevent state invalidation, call outside callback.
+     * Can be called at any time. Calling this within a callback will cause a halt
+     * after which the CPU state will be invalid! To prevent state invalidation,
+     * call outside callback.
      */
     void ClearCache();
 
     /**
      * Clears all compiled code.
-     * Can be called at any time. Calling this within a callback will cause a halt after which the CPU state will be invalid!
-     * To prevent state invalidation, call outside callback.
+     * Can be called at any time. Calling this within a callback will cause a halt
+     * after which the CPU state will be invalid! To prevent state invalidation,
+     * call outside callback.
      */
     void ClearJIT();
 
@@ -403,7 +416,7 @@ public:
      * Opaque runtime implementation pointer. For internal use only.
      */
     struct Impl;
-    Impl* impl;
+    Impl *impl;
 };
 
-}  // namespace Dynautic::A64
+} // namespace Dynautic::A64

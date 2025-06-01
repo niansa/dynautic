@@ -1,15 +1,13 @@
+#include "../globalmonitor.hpp"
+#include "../llvm.hpp"
 #include "lifter.hpp"
 #include "lifter_instance.hpp"
 #include "runtime.hpp"
-#include "../globalmonitor.hpp"
-#include "../llvm.hpp"
 
 #include <iostream>
-#include <thread>
-#include <llvm/Passes/PassBuilder.h>
 #include <llvm/Passes/OptimizationLevel.h>
-
-
+#include <llvm/Passes/PassBuilder.h>
+#include <thread>
 
 namespace Dynautic::A64 {
 namespace {
@@ -18,7 +16,8 @@ void LiftTrampoline(Lifter& self, VAddr addr) {
     std::cout << "Runtime debug message: Calling function at " << std::hex << addr << " via trampoline" << std::dec << std::endl;
 #endif
     self.rt.CheckHalt();
-    // This is the wrong signature, but still valid (hopefully). It's needed to enforce tail call optimization
+    // This is the wrong signature, but still valid (hopefully). It's needed to
+    // enforce tail call optimization
     using Function = decltype(LiftTrampoline);
     Function *fnc;
     {
@@ -29,7 +28,7 @@ void LiftTrampoline(Lifter& self, VAddr addr) {
 #ifdef __clang__
     __attribute__((musttail))
 #else
-#   warning "GCC does not support musttail, LiftTrampoline stack overhead may be increased"
+#warning "GCC does not support musttail, LiftTrampoline stack overhead may be increased"
 #endif
     return fnc(self, addr);
 }
@@ -61,9 +60,7 @@ void ResetJITForPeriodicRecompileTrampoline(Runtime::Impl& rt) {
     }
 }
 
-void CreateDynamicBranchEntryTrampoline(Cache& cache, VAddr origin, VAddr target) {
-    cache.CreateDynamicBranchEntry(origin, target);
-}
+void CreateDynamicBranchEntryTrampoline(Cache& cache, VAddr origin, VAddr target) { cache.CreateDynamicBranchEntry(origin, target); }
 
 void FreezeTrampoline(Runtime::Impl& rt) {
 #ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
@@ -163,7 +160,7 @@ void MemoryWrite128(Runtime::Impl& rt, VAddr addr, Vector value) {
 #endif
     rt.conf.callbacks->MemoryWrite128(addr, value);
 }
-}
+} // namespace
 
 void Lifter::SetupTrampolines(llvm::orc::LLJIT& jit) {
     [[maybe_unused]]
@@ -202,7 +199,6 @@ void Lifter::SetupTrampolines(llvm::orc::LLJIT& jit) {
     DYNAUTIC_ASSERT(!error);
 }
 
-
 llvm::FunctionCallee Lifter::GetMemoryRead(Instance& rinst, uint8_t bits) {
     switch (bits) {
     case 8: {
@@ -225,7 +221,8 @@ llvm::FunctionCallee Lifter::GetMemoryRead(Instance& rinst, uint8_t bits) {
         const auto ftype = llvm::FunctionType::get(rinst.GetIntType(128), {rinst.builder->getPtrTy(), rinst.GetIntType(64)}, false);
         return rinst.module->getOrInsertFunction("MemoryRead128", ftype);
     }
-    default: DYNAUTIC_ASSERT(!"Invalid memory read width (bits != {8, 16, 32, 64, 128})");
+    default:
+        DYNAUTIC_ASSERT(!"Invalid memory read width (bits != {8, 16, 32, 64, 128})");
     }
     abort();
 }
@@ -252,7 +249,8 @@ llvm::FunctionCallee Lifter::GetMemoryWrite(Instance& rinst, uint8_t bits) {
         const auto ftype = llvm::FunctionType::get(rinst.builder->getVoidTy(), {rinst.builder->getPtrTy(), rinst.GetIntType(64), rinst.GetIntType(128)}, false);
         return rinst.module->getOrInsertFunction("MemoryWrite128", ftype);
     }
-    default: DYNAUTIC_ASSERT(!"Invalid memory write width (bits != {8, 16, 32, 64, 128})");
+    default:
+        DYNAUTIC_ASSERT(!"Invalid memory write width (bits != {8, 16, 32, 64, 128})");
     }
     abort();
 }
@@ -325,12 +323,24 @@ void Lifter::OptimizeModule(llvm::Module& module) {
     // Get optimization level
     OptimizationLevel level;
     switch (rt.conf.llvm_opt_level) {
-    case LLVMOptimizationLevel::O0: level = OptimizationLevel::O0; break;
-    case LLVMOptimizationLevel::O1: level = OptimizationLevel::O1; break;
-    case LLVMOptimizationLevel::O2: level = OptimizationLevel::O2; break;
-    case LLVMOptimizationLevel::O3: level = OptimizationLevel::O3; break;
-    case LLVMOptimizationLevel::Os: level = OptimizationLevel::Os; break;
-    case LLVMOptimizationLevel::Oz: level = OptimizationLevel::Oz; break;
+    case LLVMOptimizationLevel::O0:
+        level = OptimizationLevel::O0;
+        break;
+    case LLVMOptimizationLevel::O1:
+        level = OptimizationLevel::O1;
+        break;
+    case LLVMOptimizationLevel::O2:
+        level = OptimizationLevel::O2;
+        break;
+    case LLVMOptimizationLevel::O3:
+        level = OptimizationLevel::O3;
+        break;
+    case LLVMOptimizationLevel::Os:
+        level = OptimizationLevel::Os;
+        break;
+    case LLVMOptimizationLevel::Oz:
+        level = OptimizationLevel::Oz;
+        break;
     }
 
     // Optimize module
@@ -348,4 +358,4 @@ void Lifter::OptimizeModule(llvm::Module& module) {
     mp_manager.addPass(pass_builder.buildPerModuleDefaultPipeline(level));
     mp_manager.run(module, ma_manager);
 }
-}
+} // namespace Dynautic::A64

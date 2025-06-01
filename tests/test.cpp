@@ -1,21 +1,18 @@
-#include "dynautic.hpp"
 #include "dynarmic.hpp"
+#include "dynautic.hpp"
 #include "unicorn.hpp"
 
-#include <iostream>
-#include <memory>
 #include <array>
-#include <string_view>
-#include <fstream>
-#include <filesystem>
 #include <cstdint>
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <memory>
+#include <string_view>
 
-
-
-int main(int argc, char** argv) {
-    std::unique_ptr<TestBase> dynautic = std::make_unique<TestDynautic>(),
-                              dynarmic = std::make_unique<TestDynarmic>(),
+int main(int argc, char **argv) {
+    std::unique_ptr<TestBase> dynautic = std::make_unique<TestDynautic>(), dynarmic = std::make_unique<TestDynarmic>(),
                               unicorn = std::make_unique<TestUnicorn>();
     TestBase *reference = unicorn.get();
 
@@ -416,9 +413,9 @@ int main(int argc, char** argv) {
         std::vector<uint32_t> binary;
         do {
             binary.push_back(0xffffffff);
-        } while (file.read(reinterpret_cast<char*>(&binary.back()), 4));
+        } while (file.read(reinterpret_cast<char *>(&binary.back()), 4));
         binary.pop_back();
 
-        dynautic->RunTest("Test from "+std::string(path.filename()), std::move(binary), reference);
+        dynautic->RunTest("Test from " + std::string(path.filename()), std::move(binary), reference);
     }
 }

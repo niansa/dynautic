@@ -3,9 +3,8 @@
 #include "lifter.hpp"
 
 #include <array>
-#include <vector>
 #include <capstone/capstone.h>
-
+#include <vector>
 
 namespace Dynautic::A64 {
 class Lifter::InstructionLifter {
@@ -50,15 +49,7 @@ class Lifter::InstructionLifter {
 
     llvm::Value *GetMemOpReference(bool unscaled, unsigned op_idx = 1);
 
-    enum LoadStoreFlags {
-        unscaled,
-        signed_,
-        byte,
-        half_word,
-        word,
-        exclusive,
-        release
-    };
+    enum LoadStoreFlags { unscaled, signed_, byte, half_word, word, exclusive, release };
     uint8_t GetLoadStoreFlagsAndSize(uint64_t insn_id);
 
     void DeferCompilation(bool repeat_instruction = false);
@@ -69,12 +60,12 @@ class Lifter::InstructionLifter {
 
 public:
     InstructionLifter(Lifter& parent, Lifter::Instance& rinst, const cs_insn& insn, const std::vector<VAddr>& noexec_addrs = {})
-          : p(parent), rinst(rinst), noexec_addrs(std::move(noexec_addrs)), insn(insn), detail(insn.detail->aarch64) {
+        : p(parent), rinst(rinst), noexec_addrs(std::move(noexec_addrs)), insn(insn), detail(insn.detail->aarch64) {
         p.ResetScratchRegisters();
     }
 
     bool Run(bool first_instruction);
 };
-}
+} // namespace Dynautic::A64
 
 #endif // LIFTER_INSTRUCTIONS_HPP

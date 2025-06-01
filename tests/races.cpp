@@ -1,22 +1,21 @@
 #include "addrs.hpp"
 
-#include <iostream>
-#include <fstream>
-#include <filesystem>
-#include <thread>
-#include <mutex>
-#include <vector>
-#include <unordered_map>
-#include <stdexcept>
 #include <cstring>
-#include <sys/mman.h>
 #include <dynautic/A64.hpp>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <mutex>
+#include <stdexcept>
+#include <sys/mman.h>
+#include <thread>
+#include <unordered_map>
+#include <vector>
 
 using u8 = std::uint8_t;
 using u16 = std::uint16_t;
 using u32 = std::uint32_t;
 using u64 = std::uint64_t;
-
 
 class DynauticEnv final : public Dynautic::A64::UserCallbacks {
 public:
@@ -30,9 +29,7 @@ public:
     u64 ticks_left = 0;
     std::array<u8, Addrs::mem_size> memory{};
 
-    Dynautic::A64::Runtime& GetCPU() {
-        return *cpus[std::this_thread::get_id()];
-    }
+    Dynautic::A64::Runtime& GetCPU() { return *cpus[std::this_thread::get_id()]; }
 
     u8 MemoryRead8(u64 vaddr) override {
         if (vaddr >= memory.size()) {
@@ -42,21 +39,13 @@ public:
         return memory[vaddr];
     }
 
-    u16 MemoryRead16(u64 vaddr) override {
-        return u16(MemoryRead8(vaddr)) | u16(MemoryRead8(vaddr + 1)) << 8;
-    }
+    u16 MemoryRead16(u64 vaddr) override { return u16(MemoryRead8(vaddr)) | u16(MemoryRead8(vaddr + 1)) << 8; }
 
-    u32 MemoryRead32(u64 vaddr) override {
-        return u32(MemoryRead16(vaddr)) | u32(MemoryRead16(vaddr + 2)) << 16;
-    }
+    u32 MemoryRead32(u64 vaddr) override { return u32(MemoryRead16(vaddr)) | u32(MemoryRead16(vaddr + 2)) << 16; }
 
-    u64 MemoryRead64(u64 vaddr) override {
-        return u64(MemoryRead32(vaddr)) | u64(MemoryRead32(vaddr + 4)) << 32;
-    }
+    u64 MemoryRead64(u64 vaddr) override { return u64(MemoryRead32(vaddr)) | u64(MemoryRead32(vaddr + 4)) << 32; }
 
-    u128 MemoryRead128(u64 vaddr) override {
-        return {MemoryRead64(vaddr), MemoryRead64(vaddr + 8)};
-    }
+    u128 MemoryRead128(u64 vaddr) override { return {MemoryRead64(vaddr), MemoryRead64(vaddr + 8)}; }
 
     void MemoryWrite8(u64 vaddr, u8 value) override {
         if (vaddr >= memory.size()) {
@@ -83,7 +72,7 @@ public:
 
     void MemoryWrite128(u64 vaddr, u128 value) override {
         MemoryWrite64(vaddr, value[0]);
-        MemoryWrite64(vaddr+8, value[1]);
+        MemoryWrite64(vaddr + 8, value[1]);
     }
 
     void InterpreterFallback(u64 pc, size_t num_instructions) override {
@@ -96,14 +85,14 @@ public:
             GetCPU().HaltExecution(Dynautic::HaltReason::UserDefined4);
         } else if (swi == 5) {
             std::scoped_lock L(print_mutex);
-            std::cout << std::to_string(GetCPU().GetRegister(1))+' ' << std::flush;
+            std::cout << std::to_string(GetCPU().GetRegister(1)) + ' ' << std::flush;
         } else {
             GetCPU().HaltExecution(Dynautic::HaltReason::UserDefined1);
         }
     }
 
     void ExceptionRaised(u64 pc, ::Dynautic::A64::Exception exception) override {
-        std::cerr << "Dynautic error: Exception raised at " << reinterpret_cast<void*>(pc) << ": " << static_cast<unsigned>(exception) << std::endl;
+        std::cerr << "Dynautic error: Exception raised at " << reinterpret_cast<void *>(pc) << ": " << static_cast<unsigned>(exception) << std::endl;
         if (exception == Dynautic::A64::Exception::UnallocatedEncoding || exception == Dynautic::A64::Exception::UnpredictableInstruction)
             GetCPU().HaltExecution(Dynautic::HaltReason::UserDefined3);
         else
@@ -118,15 +107,10 @@ public:
         ticks_left -= ticks;
     }
 
-    u64 GetTicksRemaining() override {
-        return ticks_left;
-    }
+    u64 GetTicksRemaining() override { return ticks_left; }
 
-    std::uint64_t GetCNTPCT() override {
-        return 0;
-    }
+    std::uint64_t GetCNTPCT() override { return 0; }
 };
-
 
 class TestDynautic : public Addrs {
     constexpr static unsigned thread_count = 32;
@@ -138,7 +122,7 @@ public:
     TestDynautic() {
         user_config.callbacks = &env;
         user_config.check_halt_on_memory_access = false;
-        mmap(reinterpret_cast<void*>(exe_base), 1024*1024/*1 MB*/, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+        mmap(reinterpret_cast<void *>(exe_base), 1024 * 1024 /*1 MB*/, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     }
 
     void Run(std::vector<u32>&& instructions) {
@@ -154,22 +138,22 @@ public:
                 env.MemoryWrite32(addr, instructions[idx]);
             }
             if (user_config.native_memory)
-                memcpy(reinterpret_cast<void*>(exe_base), instructions.data(), instructions.size()*4);
+                memcpy(reinterpret_cast<void *>(exe_base), instructions.data(), instructions.size() * 4);
 
             // Write exit SVC instruction
-            env.MemoryWrite32(exit_addr, 0xd4000081); // svc #4
-            env.MemoryWrite32(exit_addr+4, 0xd65f03c0); // ret
+            env.MemoryWrite32(exit_addr, 0xd4000081);     // svc #4
+            env.MemoryWrite32(exit_addr + 4, 0xd65f03c0); // ret
 
             // Create threads
             std::vector<std::thread> threads;
             for (unsigned thread = 0; thread != thread_count; thread++) {
-                threads.emplace_back([&, thread, this] () {
+                threads.emplace_back([&, thread, this]() {
                     // Thread-specific configuration
                     auto this_config = user_config;
                     this_config.processor_id = thread;
                     this_config.tpidr_el0 = &this_config.processor_id;
                     this_config.tpidrro_el0 = &this_config.processor_id;
-                    //this_config.dump_assembly = thread == 0;
+                    // this_config.dump_assembly = thread == 0;
 
                     // Create runtime
                     Dynautic::A64::Runtime cpu(this_config);
@@ -194,9 +178,12 @@ public:
                     // Execute
                     const auto halt_reason = cpu.Run();
                     switch (halt_reason) {
-                    case Dynautic::HaltReason::UserDefined4: break;
-                    case Dynautic::HaltReason::UserDefined3: throw std::runtime_error("Dynautic error: Illegal instruction");
-                    default: throw std::runtime_error("Dynautic error: Unexpected halt reasons: "+std::to_string(static_cast<uint32_t>(halt_reason)));
+                    case Dynautic::HaltReason::UserDefined4:
+                        break;
+                    case Dynautic::HaltReason::UserDefined3:
+                        throw std::runtime_error("Dynautic error: Illegal instruction");
+                    default:
+                        throw std::runtime_error("Dynautic error: Unexpected halt reasons: " + std::to_string(static_cast<uint32_t>(halt_reason)));
                     }
                 });
             }
@@ -210,7 +197,6 @@ public:
         }
     }
 };
-
 
 int main() {
     TestDynautic dynautic;
@@ -229,7 +215,7 @@ int main() {
         std::vector<uint32_t> binary;
         do {
             binary.push_back(0xffffffff);
-        } while (file.read(reinterpret_cast<char*>(&binary.back()), 4));
+        } while (file.read(reinterpret_cast<char *>(&binary.back()), 4));
         binary.pop_back();
 
         dynautic.Run(std::move(binary));

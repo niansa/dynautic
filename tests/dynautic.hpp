@@ -2,12 +2,10 @@
 #define DYNAUTIC_HPP
 #include "common.hpp"
 
-#include <stdexcept>
 #include <cstring>
-#include <sys/mman.h>
 #include <dynautic/A64.hpp>
-
-
+#include <stdexcept>
+#include <sys/mman.h>
 
 class DynauticEnv final : public Dynautic::A64::UserCallbacks {
 public:
@@ -26,21 +24,13 @@ public:
         return memory[vaddr];
     }
 
-    u16 MemoryRead16(u64 vaddr) override {
-        return u16(MemoryRead8(vaddr)) | u16(MemoryRead8(vaddr + 1)) << 8;
-    }
+    u16 MemoryRead16(u64 vaddr) override { return u16(MemoryRead8(vaddr)) | u16(MemoryRead8(vaddr + 1)) << 8; }
 
-    u32 MemoryRead32(u64 vaddr) override {
-        return u32(MemoryRead16(vaddr)) | u32(MemoryRead16(vaddr + 2)) << 16;
-    }
+    u32 MemoryRead32(u64 vaddr) override { return u32(MemoryRead16(vaddr)) | u32(MemoryRead16(vaddr + 2)) << 16; }
 
-    u64 MemoryRead64(u64 vaddr) override {
-        return u64(MemoryRead32(vaddr)) | u64(MemoryRead32(vaddr + 4)) << 32;
-    }
+    u64 MemoryRead64(u64 vaddr) override { return u64(MemoryRead32(vaddr)) | u64(MemoryRead32(vaddr + 4)) << 32; }
 
-    u128 MemoryRead128(u64 vaddr) override {
-        return {MemoryRead64(vaddr), MemoryRead64(vaddr + 8)};
-    }
+    u128 MemoryRead128(u64 vaddr) override { return {MemoryRead64(vaddr), MemoryRead64(vaddr + 8)}; }
 
     void MemoryWrite8(u64 vaddr, u8 value) override {
         if (vaddr >= memory.size()) {
@@ -67,7 +57,7 @@ public:
 
     void MemoryWrite128(u64 vaddr, u128 value) override {
         MemoryWrite64(vaddr, value[0]);
-        MemoryWrite64(vaddr+8, value[1]);
+        MemoryWrite64(vaddr + 8, value[1]);
     }
 
     void InterpreterFallback(u64 pc, size_t num_instructions) override {
@@ -84,15 +74,18 @@ public:
                 std::cout << std::dec << " - [x" << idx << "] 0x" << std::hex << cpu->GetRegister(idx) << '\n';
             }
             std::cout << "\nMisc registers:\n"
-                         " - [sp] 0x" << std::hex << cpu->GetSP() << "\n"
-                         " - [pc] 0x" << std::hex << cpu->GetPC() << "\n\n";
+                         " - [sp] 0x"
+                      << std::hex << cpu->GetSP()
+                      << "\n"
+                         " - [pc] 0x"
+                      << std::hex << cpu->GetPC() << "\n\n";
         } else {
             cpu->HaltExecution(Dynautic::HaltReason::UserDefined1);
         }
     }
 
     void ExceptionRaised(u64 pc, ::Dynautic::A64::Exception exception) override {
-        std::cerr << "Dynautic error: Exception raised at " << reinterpret_cast<void*>(pc) << ": " << static_cast<unsigned>(exception) << std::endl;
+        std::cerr << "Dynautic error: Exception raised at " << reinterpret_cast<void *>(pc) << ": " << static_cast<unsigned>(exception) << std::endl;
         if (exception == Dynautic::A64::Exception::UnallocatedEncoding || exception == Dynautic::A64::Exception::UnpredictableInstruction)
             cpu->HaltExecution(Dynautic::HaltReason::UserDefined3);
         else
@@ -107,15 +100,10 @@ public:
         ticks_left -= ticks;
     }
 
-    u64 GetTicksRemaining() override {
-        return ticks_left;
-    }
+    u64 GetTicksRemaining() override { return ticks_left; }
 
-    std::uint64_t GetCNTPCT() override {
-        return 0;
-    }
+    std::uint64_t GetCNTPCT() override { return 0; }
 };
-
 
 class TestDynautic final : public TestBase {
     DynauticEnv env;
@@ -125,7 +113,7 @@ public:
     TestDynautic() {
         user_config.callbacks = &env;
         // user_config.llvm_opt_level = Dynautic::LLVMOptimizationLevel::O0;
-        mmap(reinterpret_cast<void*>(exe_base), 1024*1024/*1 MB*/, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_FIXED_NOREPLACE, -1, 0);
+        mmap(reinterpret_cast<void *>(exe_base), 1024 * 1024 /*1 MB*/, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
     }
 
     void updateConfig(unsigned run) {

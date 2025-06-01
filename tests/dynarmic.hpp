@@ -2,14 +2,12 @@
 #define Dynarmic_HPP
 #include "common.hpp"
 
-#include <stdexcept>
 #include <cstring>
-#include <sys/mman.h>
-#include <dynarmic/interface/exclusive_monitor.h>
 #include <dynarmic/interface/A64/a64.h>
 #include <dynarmic/interface/A64/config.h>
-
-
+#include <dynarmic/interface/exclusive_monitor.h>
+#include <stdexcept>
+#include <sys/mman.h>
 
 class DynarmicEnv final : public Dynarmic::A64::UserCallbacks {
 public:
@@ -28,21 +26,13 @@ public:
         return memory[vaddr];
     }
 
-    u16 MemoryRead16(u64 vaddr) override {
-        return u16(MemoryRead8(vaddr)) | u16(MemoryRead8(vaddr + 1)) << 8;
-    }
+    u16 MemoryRead16(u64 vaddr) override { return u16(MemoryRead8(vaddr)) | u16(MemoryRead8(vaddr + 1)) << 8; }
 
-    u32 MemoryRead32(u64 vaddr) override {
-        return u32(MemoryRead16(vaddr)) | u32(MemoryRead16(vaddr + 2)) << 16;
-    }
+    u32 MemoryRead32(u64 vaddr) override { return u32(MemoryRead16(vaddr)) | u32(MemoryRead16(vaddr + 2)) << 16; }
 
-    u64 MemoryRead64(u64 vaddr) override {
-        return u64(MemoryRead32(vaddr)) | u64(MemoryRead32(vaddr + 4)) << 32;
-    }
+    u64 MemoryRead64(u64 vaddr) override { return u64(MemoryRead32(vaddr)) | u64(MemoryRead32(vaddr + 4)) << 32; }
 
-    u128 MemoryRead128(u64 vaddr) override {
-        return {MemoryRead64(vaddr), MemoryRead64(vaddr + 8)};
-    }
+    u128 MemoryRead128(u64 vaddr) override { return {MemoryRead64(vaddr), MemoryRead64(vaddr + 8)}; }
 
     void MemoryWrite8(u64 vaddr, u8 value) override {
         if (vaddr >= memory.size()) {
@@ -69,7 +59,7 @@ public:
 
     void MemoryWrite128(u64 vaddr, u128 value) override {
         MemoryWrite64(vaddr, value[0]);
-        MemoryWrite64(vaddr+8, value[1]);
+        MemoryWrite64(vaddr + 8, value[1]);
     }
 
     void InterpreterFallback(u64 pc, size_t num_instructions) override {
@@ -86,15 +76,18 @@ public:
                 std::cout << std::dec << " - [x" << idx << "] 0x" << std::hex << cpu->GetRegister(idx) << '\n';
             }
             std::cout << "\nMisc registers:\n"
-                         " - [sp] 0x" << std::hex << cpu->GetSP() << "\n"
-                         " - [pc] 0x" << std::hex << cpu->GetPC() << "\n\n";
+                         " - [sp] 0x"
+                      << std::hex << cpu->GetSP()
+                      << "\n"
+                         " - [pc] 0x"
+                      << std::hex << cpu->GetPC() << "\n\n";
         } else {
             cpu->HaltExecution(Dynarmic::HaltReason::UserDefined1);
         }
     }
 
     void ExceptionRaised(u64 pc, ::Dynarmic::A64::Exception exception) override {
-        std::cerr << "Dynarmic error: Exception raised at " << reinterpret_cast<void*>(pc) << ": " << static_cast<unsigned>(exception) << std::endl;
+        std::cerr << "Dynarmic error: Exception raised at " << reinterpret_cast<void *>(pc) << ": " << static_cast<unsigned>(exception) << std::endl;
         if (exception == Dynarmic::A64::Exception::UnallocatedEncoding || exception == Dynarmic::A64::Exception::UnpredictableInstruction)
             cpu->HaltExecution(Dynarmic::HaltReason::UserDefined3);
         else
@@ -109,15 +102,10 @@ public:
         ticks_left -= ticks;
     }
 
-    u64 GetTicksRemaining() override {
-        return ticks_left;
-    }
+    u64 GetTicksRemaining() override { return ticks_left; }
 
-    std::uint64_t GetCNTPCT() override {
-        return 0;
-    }
+    std::uint64_t GetCNTPCT() override { return 0; }
 };
-
 
 class TestDynarmic final : public TestBase {
     DynarmicEnv env;
@@ -127,7 +115,7 @@ public:
     TestDynarmic() {
         user_config.callbacks = &env;
         user_config.check_halt_on_memory_access = false;
-        mmap(reinterpret_cast<void*>(exe_base), 1024*1024/*1 MB*/, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+        mmap(reinterpret_cast<void *>(exe_base), 1024 * 1024 /*1 MB*/, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     }
 
     uint64_t RunTest(std::vector<u32>&& instructions, std::array<u8, TestBase::mem_size>& memory, bool no_native_memory) override {
@@ -145,8 +133,8 @@ public:
         env.cpu = &cpu;
 
         // Write exit SVC instruction
-        env.MemoryWrite32(exit_addr, 0xd4000081); // svc #4
-        env.MemoryWrite32(exit_addr+4, 0xd65f03c0); // ret
+        env.MemoryWrite32(exit_addr, 0xd4000081);     // svc #4
+        env.MemoryWrite32(exit_addr + 4, 0xd65f03c0); // ret
 
         // Copy instructions to memory
         for (unsigned addr = exe_base, idx = 0; idx != instructions.size(); addr += 4, ++idx) {
@@ -168,7 +156,7 @@ public:
 
         // Execute
         common::Timer timer;
-        restart:
+    restart:
         env.ticks_left = 10000;
         const auto halt_reason = cpu.Run();
         if (timer.get() > 180000) {
@@ -176,10 +164,15 @@ public:
             return fres;
         }
         switch (halt_reason) {
-        case static_cast<Dynarmic::HaltReason>(0): goto restart;
-        case Dynarmic::HaltReason::UserDefined4: break;
-        case Dynarmic::HaltReason::UserDefined3: cpu.SetPC(cpu.GetPC()+4); goto restart;
-        default: throw std::runtime_error("Dynarmic error: Unexpected halt reasons: "+std::to_string(static_cast<uint32_t>(halt_reason)));
+        case static_cast<Dynarmic::HaltReason>(0):
+            goto restart;
+        case Dynarmic::HaltReason::UserDefined4:
+            break;
+        case Dynarmic::HaltReason::UserDefined3:
+            cpu.SetPC(cpu.GetPC() + 4);
+            goto restart;
+        default:
+            throw std::runtime_error("Dynarmic error: Unexpected halt reasons: " + std::to_string(static_cast<uint32_t>(halt_reason)));
         }
         const auto duration = timer.get();
 

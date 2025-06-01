@@ -5,14 +5,12 @@
 #include <stdexcept>
 #include <unicorn/unicorn.h>
 
-
-
 class TestUnicorn final : public TestBase {
     uc_engine *uc;
 
     void handle_error(uc_err err) {
         if (err)
-            throw std::runtime_error("Unicorn error: "+std::string(uc_strerror(err)));
+            throw std::runtime_error("Unicorn error: " + std::string(uc_strerror(err)));
     }
 
 public:
@@ -33,14 +31,7 @@ public:
         }
 
         // Set up registers
-        const u64 x0 = 0xfabd3dd59df77212,
-                  x1 = 0xabcdfea1,
-                  x2 = 0x0,
-                  x10 = heap_base,
-                  x23 = exit_addr,
-                  x24 = exe_base,
-                  x30 = exit_addr,
-                  PC = exe_base,
+        const u64 x0 = 0xfabd3dd59df77212, x1 = 0xabcdfea1, x2 = 0x0, x10 = heap_base, x23 = exit_addr, x24 = exe_base, x30 = exit_addr, PC = exe_base,
                   SP = stack_addr;
         uc_reg_write(uc, UC_ARM64_REG_X0, &x0);
         uc_reg_write(uc, UC_ARM64_REG_X1, &x1);

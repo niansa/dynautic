@@ -1,25 +1,24 @@
+#include "../arch_traits.hpp"
+#include "../llvm.hpp"
+#include "cache.hpp"
 #include "lifter.hpp"
 #include "lifter_instance.hpp"
 #include "runtime.hpp"
-#include "cache.hpp"
-#include "../arch_traits.hpp"
-#include "../llvm.hpp"
 
 #include <optional>
 #include <vector>
 #ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
 #include <set>
 #endif
-#include <mutex>
 #include <algorithm>
+#include <mutex>
 
 using namespace llvm;
 using namespace llvm::orc;
 
-
 namespace Dynautic::A64 {
 llvm::ArrayRef<Value *> Lifter::GetFunctionArgs() const {
-    thread_local static std::array<llvm::Value*, ArchTraits::max_arg_count> fres;
+    thread_local static std::array<llvm::Value *, ArchTraits::max_arg_count> fres;
     for (unsigned it = 0; it != fres.size(); ++it)
         fres[it] = rt_values.registers[it];
     return fres;
@@ -35,19 +34,19 @@ void Lifter::LoadFunctionContext(Instance& rinst, bool new_allocas, bool load_al
     // Fill in general purpose registers
     for (unsigned idx = 0; idx != rt_allocas.registers.size(); ++idx) {
         if (new_allocas)
-            rt_allocas.registers[idx] = rinst.builder->CreateAlloca(rinst.GetIntType(64), nullptr, "alloca_x"+std::to_string(idx)+'_');
-        if (idx < (load_all?0:ArchTraits::max_arg_count))
+            rt_allocas.registers[idx] = rinst.builder->CreateAlloca(rinst.GetIntType(64), nullptr, "alloca_x" + std::to_string(idx) + '_');
+        if (idx < (load_all ? 0 : ArchTraits::max_arg_count))
             rinst.builder->CreateStore(dyn_cast<Value>(rinst.func->getArg(idx)), rt_allocas.registers[idx]);
         else
-            CreateLoadFromGlobalIntoPtr(rinst, "general_register_"+std::to_string(idx), rinst.GetIntType(64), rt_allocas.registers[idx]);
+            CreateLoadFromGlobalIntoPtr(rinst, "general_register_" + std::to_string(idx), rinst.GetIntType(64), rt_allocas.registers[idx]);
         rt_allocas.dirty_registers[idx] = true;
     }
 
     // Fill in vector registers
     for (unsigned idx = 0; idx != rt_allocas.vectors.size(); ++idx) {
         if (new_allocas)
-            rt_allocas.vectors[idx] = rinst.builder->CreateAlloca(rinst.GetIntType(128), nullptr, "alloca_q"+std::to_string(idx)+'_');
-        CreateLoadFromGlobalIntoPtr(rinst, "vector_register_"+std::to_string(idx), rinst.GetIntType(128), rt_allocas.vectors[idx]);
+            rt_allocas.vectors[idx] = rinst.builder->CreateAlloca(rinst.GetIntType(128), nullptr, "alloca_q" + std::to_string(idx) + '_');
+        CreateLoadFromGlobalIntoPtr(rinst, "vector_register_" + std::to_string(idx), rinst.GetIntType(128), rt_allocas.vectors[idx]);
         rt_allocas.dirty_vectors[idx] = true;
     }
 
@@ -88,14 +87,14 @@ void Lifter::FinalizeFunctionContext(Instance& rinst, bool store_all) {
     // Write out general purpose registers
     for (unsigned idx = store_all ? 0 : ArchTraits::max_arg_count; idx != rt_allocas.registers.size(); ++idx)
         if (rt_allocas.dirty_registers[idx] || (store_all && idx < ArchTraits::max_arg_count)) {
-            CreateStoreToGlobal(rinst, "general_register_"+std::to_string(idx), rinst.builder->CreateLoad(rinst.GetIntType(64), rt_allocas.registers[idx]));
+            CreateStoreToGlobal(rinst, "general_register_" + std::to_string(idx), rinst.builder->CreateLoad(rinst.GetIntType(64), rt_allocas.registers[idx]));
             rt_allocas.dirty_registers[idx] = false;
         }
 
     // Write out vector registers
     for (unsigned idx = 0; idx != rt_allocas.vectors.size(); ++idx)
         if (rt_allocas.dirty_vectors[idx]) {
-            CreateStoreToGlobal(rinst, "vector_register_"+std::to_string(idx), rinst.builder->CreateLoad(rinst.GetIntType(128), rt_allocas.vectors[idx]));
+            CreateStoreToGlobal(rinst, "vector_register_" + std::to_string(idx), rinst.builder->CreateLoad(rinst.GetIntType(128), rt_allocas.vectors[idx]));
             rt_allocas.dirty_vectors[idx] = false;
         }
 
@@ -131,7 +130,7 @@ void Lifter::LoadBranchContext(Instance& rinst) {
 
     // Fill in general purpose registers
     for (unsigned idx = 0; idx != rt_values.registers.size(); ++idx) {
-        rt_values.registers[idx] = rinst.builder->CreateLoad(rinst.GetIntType(64), rt_allocas.registers[idx], "x"+std::to_string(idx)+'_');
+        rt_values.registers[idx] = rinst.builder->CreateLoad(rinst.GetIntType(64), rt_allocas.registers[idx], "x" + std::to_string(idx) + '_');
         rt_values.dirty_registers[idx] = true;
     }
 
@@ -200,9 +199,7 @@ void Lifter::FinalizeBranchContext(Instance& rinst) {
     rt_values.dirty = false;
 }
 
-void Lifter::CreatePCSave(Instance& rinst) {
-    CreateStoreToPtr(rinst, &rt.pc, rinst.CreateInt(64, rinst.pc+4));
-}
+void Lifter::CreatePCSave(Instance& rinst) { CreateStoreToPtr(rinst, &rt.pc, rinst.CreateInt(64, rinst.pc + 4)); }
 
 void Lifter::CreateCheckHalt(Instance& rinst) {
     Value *runtime = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(&rt)), rinst.builder->getPtrTy());
@@ -220,7 +217,7 @@ void Lifter::CreateResetJITForPeriodicRecompileTrampolineTrampoline(Instance& ri
 Value *Lifter::CreateLoadFromGlobal(Instance& rinst, llvm::StringRef global_name, llvm::Type *type) {
     return rinst.builder->CreateLoad(type, rinst.module->getOrInsertGlobal(global_name, type));
 }
-void Lifter::CreateLoadFromGlobalIntoPtr(Instance &rinst, llvm::StringRef global_name, llvm::Type *type, llvm::Value *ptr) {
+void Lifter::CreateLoadFromGlobalIntoPtr(Instance& rinst, llvm::StringRef global_name, llvm::Type *type, llvm::Value *ptr) {
     rinst.builder->CreateStore(CreateLoadFromGlobal(rinst, global_name, type), ptr);
 }
 void Lifter::CreateStoreToGlobal(Instance& rinst, llvm::StringRef global_name, llvm::Value *value) {
@@ -228,7 +225,8 @@ void Lifter::CreateStoreToGlobal(Instance& rinst, llvm::StringRef global_name, l
 }
 
 Value *Lifter::CreateLoadFromPtr(Instance& rinst, const void *ptr, Type *type, const llvm::Twine& name) {
-    return rinst.builder->CreateLoad(type, rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<uint64_t>(ptr)), rinst.builder->getPtrTy()), name);
+    return rinst.builder->CreateLoad(type, rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<uint64_t>(ptr)), rinst.builder->getPtrTy()),
+                                     name);
 }
 void Lifter::CreateStoreToPtr(Instance& rinst, void *ptr, llvm::Value *value) {
     rinst.builder->CreateStore(value, rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<uint64_t>(ptr)), rinst.builder->getPtrTy()));
@@ -297,7 +295,7 @@ void Lifter::CreateCall(Instance& rinst, VAddr origin, VAddr address) {
 
 llvm::BasicBlock *Lifter::PrepareBranch(Instance& rinst, VAddr origin, Value *address) {
     VAddr *addr;
-    BasicBlock *block = rinst.QueueDynamicBranch(addr, origin, "DynamicBranchFrom"+std::to_string(origin));
+    BasicBlock *block = rinst.QueueDynamicBranch(addr, origin, "DynamicBranchFrom" + std::to_string(origin));
     Value *addr_ptr = rinst.builder->CreateIntToPtr(rinst.CreateInt(64, reinterpret_cast<VAddr>(addr)), rinst.builder->getPtrTy());
     rinst.builder->CreateStore(address, addr_ptr);
     return block;
@@ -309,7 +307,7 @@ llvm::BasicBlock *Lifter::PrepareBranch(Instance& rinst, VAddr address) {
     if (!rt.conf.HasOptimization(OptimizationFlag::BlockLinking))
         return PrepareBranch(rinst, rinst.pc, rinst.CreateInt(64, address));
 
-    return rinst.QueueBranch(address, "BranchAt"+std::to_string(address));
+    return rinst.QueueBranch(address, "BranchAt" + std::to_string(address));
 }
 
 void Lifter::CreateBranch(Instance& rinst, llvm::BasicBlock *block) {
@@ -342,7 +340,8 @@ void Lifter::CreateUseDynamicBranchCache(Instance& rinst, VAddr origin, Value *a
             // Unlock mutex
             L.reset();
 
-            // Only create switch case if compilation not fully static and more than one entry exists
+            // Only create switch case if compilation not fully static and more than
+            // one entry exists
             if (entries.size() > 1 || !rt.conf.fully_static) {
                 // Create switch (TODO: Branch weights?)
                 BasicBlock *default_case = rinst.CreateBasicBlock("DefaultCase");
@@ -445,9 +444,9 @@ void Lifter::CreateFreezeTrampoline(Instance& rinst) {
 }
 
 void Lifter::CreateExclusiveMonitorTagTrampoline(Instance& rinst, llvm::Value *addr) {
-    #ifdef __aarch64__
+#ifdef __aarch64__
     DYNAUTIC_ASSERT(!rt.conf.native_memory);
-    #endif
+#endif
 
     if (rt_values.exclusive_monitor)
         CreateExclusiveMonitorUntagTrampoline(rinst, rt_values.exclusive_monitor);
@@ -480,9 +479,10 @@ llvm::Value *Lifter::CreateExclusiveMonitorIsPoisonedTrampoline(Instance& rinst,
 
 void Lifter::CreateDebugPrintTrampoline(Instance& rinst, const char *message) {
 #ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
-    static std::set<const char*> known_messages;
+    static std::set<const char *> known_messages;
     if (known_messages.empty())
-        outs() << "Runtime debug messages are enabled! To disable, undefine `ENABLE_RUNTIME_DEBUG_MESSAGES`.\n";
+        outs() << "Runtime debug messages are enabled! To disable, undefine "
+                  "`ENABLE_RUNTIME_DEBUG_MESSAGES`.\n";
     if (known_messages.count(message) == 0)
         outs() << "Runtime debug message: Message \"" << message << "\" maps to " << reinterpret_cast<VAddr>(message) << '\n';
     known_messages.emplace(message);
@@ -494,4 +494,4 @@ void Lifter::CreateDebugPrintTrampoline(Instance& rinst, const char *message) {
     (void)message;
 #endif
 }
-}
+} // namespace Dynautic::A64

@@ -1,10 +1,9 @@
 #ifndef CACHE_HPP
 #define CACHE_HPP
+#include <dynautic/A64.hpp>
+#include <mutex>
 #include <unordered_map>
 #include <vector>
-#include <mutex>
-#include <dynautic/A64.hpp>
-
 
 namespace Dynautic::A64 {
 struct Cache {
@@ -25,5 +24,5 @@ struct Cache {
     void Load(const std::vector<uint64_t>&);
     std::vector<uint64_t> Dump() const;
 };
-}
+} // namespace Dynautic::A64
 #endif // CACHE_HPP

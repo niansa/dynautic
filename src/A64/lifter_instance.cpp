@@ -5,28 +5,24 @@
 using namespace llvm;
 using namespace llvm::orc;
 
-
 namespace Dynautic::A64 {
 llvm::ArrayRef<Type *> Lifter::Instance::GetFunctionArgTypes() const {
-    thread_local static std::array<llvm::Type*, ArchTraits::max_arg_count> fres;
+    thread_local static std::array<llvm::Type *, ArchTraits::max_arg_count> fres;
     fres.fill(Type::getInt64Ty(*context));
     return fres;
 }
 
 Lifter::Instance::Instance(Runtime::Impl& runtime, llvm::LLVMContext *context, llvm::Module *module, const std::string& function_name)
-      : rt(runtime), context(context), module(module) {
+    : rt(runtime), context(context), module(module) {
     // Try to get function first, if that fails, create
     if (!(func = module->getFunction(function_name))) {
-        func = Function::Create(FunctionType::get(Type::getVoidTy(*context),
-                                                  GetFunctionArgTypes(), false),
-                                Function::ExternalLinkage, function_name, *module);
+        func = Function::Create(FunctionType::get(Type::getVoidTy(*context), GetFunctionArgTypes(), false), Function::ExternalLinkage, function_name, *module);
     }
     func->setCallingConv(CallingConv::Tail);
 }
 
 llvm::FunctionCallee Lifter::Instance::DeclareFunction(llvm::StringRef name) {
-    return module->getOrInsertFunction(name, FunctionType::get(Type::getVoidTy(*context),
-                                                               GetFunctionArgTypes(), false));
+    return module->getOrInsertFunction(name, FunctionType::get(Type::getVoidTy(*context), GetFunctionArgTypes(), false));
 }
 
 bool Lifter::Instance::NextBranch() {
@@ -47,7 +43,7 @@ BasicBlock *Lifter::Instance::GetBranch(VAddr addr) const {
     return nullptr;
 }
 
-BasicBlock *Lifter::Instance::QueueBranch(VAddr addr, const Twine &name) {
+BasicBlock *Lifter::Instance::QueueBranch(VAddr addr, const Twine& name) {
     // Try to find existing branch
     for (const auto& branch : branches)
         if (branch->addr == addr)
@@ -59,11 +55,11 @@ BasicBlock *Lifter::Instance::QueueBranch(VAddr addr, const Twine &name) {
     return queued_branches.emplace(branches.emplace_back(std::move(branch)).get())->basic_block;
 }
 
-BasicBlock *Lifter::Instance::QueueDynamicBranch(VAddr *&addr, VAddr origin, const Twine &name) {
+BasicBlock *Lifter::Instance::QueueDynamicBranch(VAddr *& addr, VAddr origin, const Twine& name) {
     // Queue new dynamic branch
     auto branch = std::make_unique<Branch>(*this, name);
     branch->SetDynamic(origin);
     addr = &branch->addr;
     return queued_branches.emplace(branches.emplace_back(std::move(branch)).get())->basic_block;
 }
-}
+} // namespace Dynautic::A64

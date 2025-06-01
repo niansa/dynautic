@@ -2,17 +2,16 @@
 #define COMMON_HPP
 #include "timer.hpp"
 
+#include <cstdint>
+#include <fstream>
 #include <iostream>
 #include <string_view>
 #include <vector>
-#include <fstream>
-#include <cstdint>
 
 using u8 = std::uint8_t;
 using u16 = std::uint16_t;
 using u32 = std::uint32_t;
 using u64 = std::uint64_t;
-
 
 class TestBase {
 public:

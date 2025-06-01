@@ -1,18 +1,16 @@
 #pragma once
 
-#include "lifter.hpp"
-#include "cache.hpp"
-#include "../timer.hpp"
 #include "../globalmonitor.hpp"
 #include "../llvm.hpp"
+#include "../timer.hpp"
+#include "cache.hpp"
+#include "lifter.hpp"
 
 #include "../minicoro.h"
 
+#include <dynautic/A64.hpp>
 #include <memory>
 #include <unordered_map>
-#include <dynautic/A64.hpp>
-
-
 
 namespace Dynautic::A64 {
 class ExecutionContext {
@@ -30,20 +28,15 @@ public:
     void Create(const llvm::orc::ExecutorAddr&);
     void Destroy();
 
-    void Yield() {
-        mco_yield(coro);
-    }
+    void Yield() { mco_yield(coro); }
     void Resume() {
         mco_resume(coro);
         if (mco_status(coro) == MCO_DEAD)
             Destroy();
     }
 
-    bool Exists() const {
-        return coro != nullptr;
-    }
+    bool Exists() const { return coro != nullptr; }
 };
-
 
 struct Runtime::Impl {
     Runtime *parent;
@@ -63,9 +56,10 @@ struct Runtime::Impl {
 
     Impl(UserConfig, Runtime *);
 
-    bool IsOk() const {
-        return jit != nullptr;
-    }
+    bool IsOk() const { return jit != nullptr; }
+
+    /// Enforces configuration constraints.
+    void EnforceConfigConstraints();
 
     /// Recreates JIT. Updates IsOk() state.
     void CreateJit();
@@ -100,4 +94,4 @@ struct Runtime::Impl {
     static void MemoryWrite64(Runtime::Impl&, VAddr vaddr, std::uint64_t);
     static void MemoryWrite128(Runtime::Impl&, VAddr vaddr, Vector);
 };
-}
+} // namespace Dynautic::A64

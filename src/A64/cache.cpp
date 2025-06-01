@@ -1,7 +1,5 @@
 #include "cache.hpp"
 
-
-
 namespace Dynautic::A64 {
 void Cache::CreateDynamicBranchEntry(VAddr origin, VAddr target) {
     std::scoped_lock L(dynamic_branches_mutex);
@@ -48,4 +46,4 @@ std::vector<uint64_t> Cache::Dump() const {
 
     return fres;
 }
-}
+} // namespace Dynautic::A64

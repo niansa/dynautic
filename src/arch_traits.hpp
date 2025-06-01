@@ -10,7 +10,7 @@ constexpr unsigned max_arg_count = 8;
 #else
 constexpr unsigned max_arg_count = 0;
 #endif
-}
-}
+} // namespace ArchTraits
+} // namespace Dynautic
 
 #endif // ARCH_TRAITS_HPP

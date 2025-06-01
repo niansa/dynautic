@@ -1,12 +1,11 @@
-#include "lifter.hpp"
-#include "lifter_instructions.hpp"
-#include "lifter_instance.hpp"
-#include "runtime.hpp"
 #include "../llvm.hpp"
+#include "lifter.hpp"
+#include "lifter_instance.hpp"
+#include "lifter_instructions.hpp"
+#include "runtime.hpp"
 
 using namespace llvm;
 using namespace llvm::orc;
-
 
 namespace Dynautic::A64 {
 enum NZCV : uint8_t {
@@ -19,9 +18,8 @@ enum NZCV : uint8_t {
     nzcv_used = 0b0001 << 4,
 };
 
-
 Value *Lifter::InstructionLifter::ToInt1(llvm::Value *value, bool invert) {
-    return rinst.builder->CreateICmp(invert?CmpInst::ICMP_EQ:CmpInst::ICMP_NE, value, rinst.CreateInt(8, 0));
+    return rinst.builder->CreateICmp(invert ? CmpInst::ICMP_EQ : CmpInst::ICMP_NE, value, rinst.CreateInt(8, 0));
 }
 
 Value *Lifter::InstructionLifter::GetNZCVCondition() {
@@ -30,40 +28,57 @@ Value *Lifter::InstructionLifter::GetNZCVCondition() {
     // Check conditions
     bool invert = false;
     switch (detail.cc) {
-    case AArch64CC_NE: invert = true; [[fallthrough]];
+    case AArch64CC_NE:
+        invert = true;
+        [[fallthrough]];
     case AArch64CC_EQ: {
         condition = rinst.builder->CreateAnd(nzcv, z);
     } break;
-    case AArch64CC_LO: invert = true; [[fallthrough]];
+    case AArch64CC_LO:
+        invert = true;
+        [[fallthrough]];
     case AArch64CC_HS: {
         condition = rinst.builder->CreateAnd(nzcv, c);
     } break;
-    case AArch64CC_PL: invert = true; [[fallthrough]];
+    case AArch64CC_PL:
+        invert = true;
+        [[fallthrough]];
     case AArch64CC_MI: {
         condition = rinst.builder->CreateAnd(nzcv, n);
     } break;
-    case AArch64CC_VC: invert = true; [[fallthrough]];
+    case AArch64CC_VC:
+        invert = true;
+        [[fallthrough]];
     case AArch64CC_VS: {
         condition = rinst.builder->CreateAnd(nzcv, v);
     } break;
-    case AArch64CC_LS: invert = true; [[fallthrough]];
+    case AArch64CC_LS:
+        invert = true;
+        [[fallthrough]];
     case AArch64CC_HI: {
         condition = rinst.builder->CreateAnd(rinst.builder->CreateAnd(nzcv, c), rinst.builder->CreateAnd(rinst.builder->CreateNot(nzcv), z));
     } break;
-    case AArch64CC_GE: invert = true; [[fallthrough]];
+    case AArch64CC_GE:
+        invert = true;
+        [[fallthrough]];
     case AArch64CC_LT: {
         condition = rinst.builder->CreateAnd(rinst.builder->CreateXor(nzcv, rinst.builder->CreateShl(nzcv, 3)), n);
     } break;
-    case AArch64CC_LE: invert = true; [[fallthrough]];
+    case AArch64CC_LE:
+        invert = true;
+        [[fallthrough]];
     case AArch64CC_GT: {
         condition = rinst.builder->CreateNot(rinst.builder->CreateAnd(rinst.builder->CreateXor(nzcv, rinst.builder->CreateShl(nzcv, 3)), n));
         condition = rinst.builder->CreateAnd(condition, rinst.builder->CreateShl(rinst.builder->CreateAnd(rinst.builder->CreateNot(nzcv), z), 1));
     } break;
-    case AArch64CC_NV: invert = true; [[fallthrough]];
+    case AArch64CC_NV:
+        invert = true;
+        [[fallthrough]];
     case AArch64CC_AL: {
         condition = rinst.CreateInt(8, 1);
     } break;
-    case AArch64CC_Invalid: DYNAUTIC_ASSERT(!"Invalid condition");
+    case AArch64CC_Invalid:
+        DYNAUTIC_ASSERT(!"Invalid condition");
     }
     return ToInt1(condition, invert);
 }
@@ -92,7 +107,9 @@ Value *Lifter::InstructionLifter::GetComparisonCondition() {
     case AArch64CC_PL: {
         condition = rinst.builder->CreateICmpSGE(left, ConstantInt::get(left->getType(), 0, true));
     } break;
-    case AArch64CC_VC: invert = true; [[fallthrough]];
+    case AArch64CC_VC:
+        invert = true;
+        [[fallthrough]];
     case AArch64CC_VS: {
         Value *result = rinst.builder->CreateIntrinsic(Intrinsic::ssub_with_overflow, {left->getType(), right->getType()}, {left, right});
         condition = rinst.builder->CreateExtractValue(result, 1);
@@ -123,24 +140,25 @@ Value *Lifter::InstructionLifter::GetComparisonCondition() {
     case AArch64CC_NV: {
         condition = rinst.builder->getInt1(false);
     } break;
-    default: DYNAUTIC_ASSERT(!"Invalid condition");
+    default:
+        DYNAUTIC_ASSERT(!"Invalid condition");
     }
     return condition;
 }
 
 Value *Lifter::InstructionLifter::GetCondition() {
-    /// This function decides if a NZCV based condition should be emitted or a comparison based one.
-    /// The comparison based one allows for more optimal performance but the NZCV based one is needed
-    /// in some cases.
+    /// This function decides if a NZCV based condition should be emitted or a
+    /// comparison based one. The comparison based one allows for more optimal
+    /// performance but the NZCV based one is needed in some cases.
     if (p.rt_values.nzcv && p.rt_values.comparison.first) {
-        /// This is a way to decide about the use of either NZCV or comparision values without branching.
-        /// Most of the time LLVM is able to optimize away the part of the equation that isn't needed.
+        /// This is a way to decide about the use of either NZCV or comparision
+        /// values without branching. Most of the time LLVM is able to optimize away
+        /// the part of the equation that isn't needed.
         Value *nzcv = p.rt_values.nzcv;
         Value *use_comparison = ToInt1(rinst.builder->CreateAnd(rinst.builder->CreateNot(nzcv), nzcv_used));
         Value *use_nzcv = ToInt1(rinst.builder->CreateAnd(nzcv, nzcv_used));
-        return rinst.builder->CreateOr(
-            rinst.builder->CreateAnd(use_comparison, GetComparisonCondition()),
-            rinst.builder->CreateAnd(use_nzcv, GetNZCVCondition()));
+        return rinst.builder->CreateOr(rinst.builder->CreateAnd(use_comparison, GetComparisonCondition()),
+                                       rinst.builder->CreateAnd(use_nzcv, GetNZCVCondition()));
     } else if (p.rt_values.nzcv) {
         return GetNZCVCondition();
     } else if (p.rt_values.comparison.first) {
@@ -173,9 +191,7 @@ void Lifter::InstructionLifter::SetNZCV(llvm::Value *value) {
 
 void Lifter::InstructionLifter::SetNZFromInt(llvm::Value *value) {
     llvm::Value *zero = ConstantInt::get(value->getType(), 0);
-    SetNZCV(
-        GetN(rinst.builder->CreateICmpSLT(value, zero)),
-        GetZ(rinst.builder->CreateICmpEQ(value, zero)));
+    SetNZCV(GetN(rinst.builder->CreateICmpSLT(value, zero)), GetZ(rinst.builder->CreateICmpEQ(value, zero)));
 }
 
 void Lifter::InstructionLifter::SetZFromInt(llvm::Value *value) {
@@ -183,21 +199,13 @@ void Lifter::InstructionLifter::SetZFromInt(llvm::Value *value) {
     SetNZCV(GetZ(rinst.builder->CreateICmpEQ(value, zero)));
 }
 
-llvm::Value *Lifter::InstructionLifter::GetN(llvm::Value *value) {
-    return rinst.builder->CreateSelect(value, rinst.CreateInt(8, n), rinst.CreateInt(8, 0));
-}
+llvm::Value *Lifter::InstructionLifter::GetN(llvm::Value *value) { return rinst.builder->CreateSelect(value, rinst.CreateInt(8, n), rinst.CreateInt(8, 0)); }
 
-llvm::Value *Lifter::InstructionLifter::GetZ(llvm::Value *value) {
-    return rinst.builder->CreateSelect(value, rinst.CreateInt(8, z), rinst.CreateInt(8, 0));
-}
+llvm::Value *Lifter::InstructionLifter::GetZ(llvm::Value *value) { return rinst.builder->CreateSelect(value, rinst.CreateInt(8, z), rinst.CreateInt(8, 0)); }
 
-llvm::Value *Lifter::InstructionLifter::GetC(llvm::Value *value) {
-    return rinst.builder->CreateSelect(value, rinst.CreateInt(8, c), rinst.CreateInt(8, 0));
-}
+llvm::Value *Lifter::InstructionLifter::GetC(llvm::Value *value) { return rinst.builder->CreateSelect(value, rinst.CreateInt(8, c), rinst.CreateInt(8, 0)); }
 
-llvm::Value *Lifter::InstructionLifter::GetV(llvm::Value *value) {
-    return rinst.builder->CreateSelect(value, rinst.CreateInt(8, v), rinst.CreateInt(8, 0));
-}
+llvm::Value *Lifter::InstructionLifter::GetV(llvm::Value *value) { return rinst.builder->CreateSelect(value, rinst.CreateInt(8, v), rinst.CreateInt(8, 0)); }
 
 void Lifter::InstructionLifter::SetNZCV(llvm::Value *n, llvm::Value *z, llvm::Value *c, llvm::Value *v) {
     Value *value = rinst.builder->CreateOr(n, z);
@@ -216,4 +224,4 @@ void Lifter::InstructionLifter::SetNZCVIf(llvm::Value *value, llvm::Value *condi
     // Select either old or new value
     p.rt_values.nzcv = rinst.builder->CreateSelect(condition, value, p.rt_values.nzcv, "nzcv_");
 }
-}
+} // namespace Dynautic::A64

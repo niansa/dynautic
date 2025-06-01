@@ -1,24 +1,22 @@
 #include "lifter.hpp"
-#include "runtime.hpp"
+#include "../llvm.hpp"
 #include "lifter_instance.hpp"
 #include "lifter_instructions.hpp"
-#include "../llvm.hpp"
+#include "runtime.hpp"
 
-#include <string>
-#include <vector>
+#include <array>
+#include <capstone/capstone.h>
+#include <dynautic/A64.hpp>
 #include <memory>
 #include <optional>
-#include <array>
-#include <dynautic/A64.hpp>
-#include <capstone/capstone.h>
+#include <string>
+#include <vector>
 
 using namespace llvm;
 using namespace llvm::orc;
 
-
 namespace Dynautic::A64 {
-Lifter::Lifter(Runtime::Impl& runtime)
-      : rt(runtime) {
+Lifter::Lifter(Runtime::Impl& runtime) : rt(runtime) {
     if (cs_open(CS_ARCH_AARCH64, CS_MODE_LITTLE_ENDIAN, &cs_handle) != CS_ERR_OK) {
         cs_handle = 0;
     } else {
@@ -32,13 +30,9 @@ Lifter::~Lifter() {
         cs_close(&cs_handle);
 }
 
-std::string Lifter::GetFunctionName(VAddr addr) {
-    return "FncAt"+std::to_string(addr);
-}
+std::string Lifter::GetFunctionName(VAddr addr) { return "FncAt" + std::to_string(addr); }
 
-FunctionCallee Lifter::GetLiftedFunction(Instance& rinst, VAddr addr) {
-    return rinst.DeclareFunction(GetFunctionName(addr));
-}
+FunctionCallee Lifter::GetLiftedFunction(Instance& rinst, VAddr addr) { return rinst.DeclareFunction(GetFunctionName(addr)); }
 
 std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
     // Skip if entry already compiled
@@ -54,7 +48,7 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
 
     // Set up context and module
     std::unique_ptr<LLVMContext> context = std::make_unique<LLVMContext>();
-    std::unique_ptr<Module> module = std::make_unique<Module>("ModuleAt"+std::to_string(addr), *context);
+    std::unique_ptr<Module> module = std::make_unique<Module>("ModuleAt" + std::to_string(addr), *context);
 
     // List of processed but not yet compiled functions
     std::vector<VAddr> processed_fncs;
@@ -106,7 +100,7 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
     }
 
     // Get entry function name
-    const auto entry_fnc_name = GetFunctionName(addr)+"Entry";
+    const auto entry_fnc_name = GetFunctionName(addr) + "Entry";
 
     // Create entry function
     Instance rinst(rt, context.get(), module.get(), entry_fnc_name);
@@ -128,9 +122,9 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
     else
 
 #endif
-    // Optimize module
-    if (rt.conf.HasOptimization(OptimizationFlag::LLVMIROpt))
-        OptimizeModule(*module);
+        // Optimize module
+        if (rt.conf.HasOptimization(OptimizationFlag::LLVMIROpt))
+            OptimizeModule(*module);
 
     // Dump generated IR if enabled
     if (rt.conf.dump_assembly)
@@ -175,17 +169,17 @@ void Lifter::LiftLeaf(Instance& rinst, VAddr addr) {
 
     // Lift instructions in blocks
     std::array<uint8_t, 0x100> block;
-    static_assert((block.size()%4) == 0);
+    static_assert((block.size() % 4) == 0);
     bool first_instruction = true;
     for (bool stop = false; !stop; addr += block.size()) {
         // Read block
         for (unsigned off = 0; off != block.size(); off += 4) {
-            uint32_t& instr = *reinterpret_cast<uint32_t*>(&block[off]);
-            const auto opt = rt.conf.callbacks->MemoryReadCode(addr+off);
+            uint32_t& instr = *reinterpret_cast<uint32_t *>(&block[off]);
+            const auto opt = rt.conf.callbacks->MemoryReadCode(addr + off);
             if (opt.has_value()) {
                 instr = opt.value();
             } else {
-                noexec_addrs.push_back(addr+off);
+                noexec_addrs.push_back(addr + off);
                 instr = 0xffffffff;
             }
         }
@@ -207,7 +201,7 @@ void Lifter::LiftLeaf(Instance& rinst, VAddr addr) {
         cs_free(insns, count);
 
         // Stop if instruction count is not max
-        if (count != block.size()/4)
+        if (count != block.size() / 4)
             break;
     }
 
@@ -224,4 +218,4 @@ void Lifter::LiftLeaf(Instance& rinst, VAddr addr) {
 bool Lifter::LiftInstruction(Instance& rinst, const cs_insn& insn, bool first_instruction, const std::vector<VAddr>& noexec_addrs) {
     return InstructionLifter(*this, rinst, insn, noexec_addrs).Run(first_instruction);
 }
-}
+} // namespace Dynautic::A64

@@ -1,12 +1,11 @@
 #include "globalmonitor.hpp"
 
-#include <vector>
-#include <memory>
 #include <csignal>
-#include <unistd.h>
-#include <sys/mman.h>
 #include <dynautic/common.hpp>
-
+#include <memory>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <vector>
 
 namespace Dynautic {
 static size_t page_size = static_cast<size_t>(sysconf(_SC_PAGESIZE));
@@ -14,11 +13,10 @@ static size_t page_size = static_cast<size_t>(sysconf(_SC_PAGESIZE));
 std::vector<std::unique_ptr<GlobalMonitor>> GlobalMonitor::monitors;
 std::mutex GlobalMonitor::monitors_mutex{};
 
-
 namespace {
 #ifdef ____GNUC__
 #pragma GCC push_options
-#pragma GCC optimize ("O0")
+#pragma GCC optimize("O0")
 #endif
 
 #ifdef __clang__
@@ -37,23 +35,20 @@ int WasteTime() {
 #ifdef ____GNUC__
 #pragma GCC pop_options
 #endif
-}
+} // namespace
 
-
-Addr GlobalMonitor::GetPageAddr(Addr addr) {
-    return (addr / page_size) * page_size;
-}
+Addr GlobalMonitor::GetPageAddr(Addr addr) { return (addr / page_size) * page_size; }
 
 void GlobalMonitor::ProtectPage(Addr addr) {
     int dummy;
     DYNAUTIC_ASSERT(GetPageAddr(reinterpret_cast<Addr>(&dummy)) != addr);
-    bool mprotect_error = mprotect(reinterpret_cast<void*>(addr), page_size, PROT_READ|PROT_EXEC);
+    bool mprotect_error = mprotect(reinterpret_cast<void *>(addr), page_size, PROT_READ | PROT_EXEC);
     DYNAUTIC_ASSERT(!mprotect_error);
 }
 
 void GlobalMonitor::UnprotectPage(Addr addr) {
     // rwx is evil but works for now
-    bool mprotect_error = mprotect(reinterpret_cast<void*>(addr), page_size, PROT_READ|PROT_WRITE|PROT_EXEC);
+    bool mprotect_error = mprotect(reinterpret_cast<void *>(addr), page_size, PROT_READ | PROT_WRITE | PROT_EXEC);
     DYNAUTIC_ASSERT(!mprotect_error);
 }
 
@@ -95,7 +90,7 @@ void GlobalMonitor::SetupNativeProtection() {
 
     // Setup signal handler
     struct sigaction act;
-    memset (&act, '\0', sizeof(act));
+    memset(&act, '\0', sizeof(act));
     act.sa_sigaction = &ProtectionFaultHandler;
     act.sa_flags = SA_SIGINFO;
     bool sigaction_error = sigaction(SIGSEGV, &act, NULL) < 0;
@@ -112,7 +107,7 @@ void GlobalMonitor::Create(uint8_t system_id, bool native) {
         SetupNativeProtection();
 
     if (monitors.size() <= system_id)
-        monitors.resize(system_id+1);
+        monitors.resize(system_id + 1);
 
     auto& monitor = monitors[system_id];
     if (!monitor)
@@ -121,7 +116,7 @@ void GlobalMonitor::Create(uint8_t system_id, bool native) {
         monitor->native = native;
 }
 
-GlobalMonitor &GlobalMonitor::Get(uint8_t system_id) {
+GlobalMonitor& GlobalMonitor::Get(uint8_t system_id) {
     std::scoped_lock L(monitors_mutex);
     return *monitors[system_id];
 }

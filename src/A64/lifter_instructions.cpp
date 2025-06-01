@@ -1,21 +1,23 @@
-#include "lifter.hpp"
 #include "lifter_instructions.hpp"
+#include "../llvm.hpp"
+#include "lifter.hpp"
 #include "lifter_instance.hpp"
 #include "runtime.hpp"
-#include "../llvm.hpp"
 
 using namespace llvm;
 using namespace llvm::orc;
-
 
 namespace Dynautic::A64 {
 uint64_t Lifter::InstructionLifter::GetImm(const cs_aarch64_op& op) {
     shift = static_cast<uint8_t>(op.shift.value);
     shift_type = op.shift.type;
     switch (op.type) {
-    case AArch64_OP_IMM: return static_cast<uint64_t>(op.imm);
-    case AArch64_OP_FP: return *reinterpret_cast<const uint64_t *>(&op.fp);
-    default: DYNAUTIC_ASSERT(!"Unsupported immediate type");
+    case AArch64_OP_IMM:
+        return static_cast<uint64_t>(op.imm);
+    case AArch64_OP_FP:
+        return *reinterpret_cast<const uint64_t *>(&op.fp);
+    default:
+        DYNAUTIC_ASSERT(!"Unsupported immediate type");
     }
     return 0;
 }
@@ -34,7 +36,9 @@ uint16_t Lifter::InstructionLifter::GetImm16WithShift(uint64_t value) {
         shift = 32;
     else if (value & 0xffff000000000000ul && !(value & ~0xffff000000000000ul))
         shift = 48;
-    else {DYNAUTIC_ASSERT(!"GetImmShift applied incorrectly");}
+    else {
+        DYNAUTIC_ASSERT(!"GetImmShift applied incorrectly");
+    }
     // Set shift type and result
     if (shift) {
         shift_type = AArch64_SFT_LSL;
@@ -47,7 +51,7 @@ uint16_t Lifter::InstructionLifter::GetImm16WithShift(uint64_t value) {
 RegisterDescription Lifter::InstructionLifter::GetImmAsReg(const cs_aarch64_op& op, bool as_word) {
     auto fres = p.AllocateScratchRegister(as_word);
     const auto imm = GetImm(op);
-    p.GetRawRegister(fres, true) = as_word?rinst.CreateInt(32, static_cast<uint32_t>(imm)):rinst.CreateInt(64, imm);
+    p.GetRawRegister(fres, true) = as_word ? rinst.CreateInt(32, static_cast<uint32_t>(imm)) : rinst.CreateInt(64, imm);
     return fres;
 }
 
@@ -57,7 +61,7 @@ std::array<RegisterDescription, Lifter::InstructionLifter::GetOps_max_op_count> 
     for (unsigned op_idx = 0; op_idx != op_count; ++op_idx) {
         // Get operand value
         const cs_aarch64_op& op = detail.operands[op_idx];
-        switch(op.type) {
+        switch (op.type) {
         case AArch64_OP_REG: {
             // Get register
             regs[op_idx] = {p.cs_handle, op.reg, op.vas};
@@ -69,7 +73,8 @@ std::array<RegisterDescription, Lifter::InstructionLifter::GetOps_max_op_count> 
         case AArch64_OP_MEM_REG: {
             // Add up references
             DYNAUTIC_ASSERT(op.vas == AArch64Layout_VectorLayout::AArch64Layout_Invalid);
-            Value *reference = rinst.builder->CreateAdd(p.GetRegisterView(rinst, {p.cs_handle, op.mem.base}), p.GetRegisterView(rinst, {p.cs_handle, op.mem.index}));
+            Value *reference =
+                rinst.builder->CreateAdd(p.GetRegisterView(rinst, {p.cs_handle, op.mem.base}), p.GetRegisterView(rinst, {p.cs_handle, op.mem.index}));
             reference = rinst.builder->CreateAdd(reference, rinst.CreateInt(32, op.mem.disp));
             // Load value from reference
             DYNAUTIC_ASSERT(op_idx != 0);
@@ -80,10 +85,11 @@ std::array<RegisterDescription, Lifter::InstructionLifter::GetOps_max_op_count> 
         case AArch64_OP_INVALID: {
             // Copy last register onto self to fill list
             if (op_idx != 0) {
-                regs[op_idx] = regs[op_idx-1];
+                regs[op_idx] = regs[op_idx - 1];
                 break;
             }
-        } [[fallthrough]];
+        }
+            [[fallthrough]];
         default: {
             DYNAUTIC_ASSERT(!"Unknown operand type");
             if (rinst.rt.conf.unsafe_unexpected_situation_handling)
@@ -103,7 +109,7 @@ std::array<RegisterDescription, Lifter::InstructionLifter::GetOps_max_op_count> 
 
 void Lifter::InstructionLifter::CreateCall(unsigned op_idx) {
     const cs_aarch64_op& op = detail.operands[op_idx];
-    switch(op.type) {
+    switch (op.type) {
     case AArch64_OP_REG: {
         // Queue dynamic branch for lift
         return p.CreateCall(rinst, insn.address, p.GetRegisterView(rinst, {p.cs_handle, op.reg}));
@@ -122,7 +128,7 @@ void Lifter::InstructionLifter::CreateCall(unsigned op_idx) {
 
 BasicBlock *Lifter::InstructionLifter::PrepareBranch(unsigned op_idx) {
     const cs_aarch64_op& op = detail.operands[op_idx];
-    switch(op.type) {
+    switch (op.type) {
     case AArch64_OP_REG: {
         // Queue dynamic branch for lift
         return p.PrepareBranch(rinst, insn.address, p.GetRegisterView(rinst, {p.cs_handle, op.reg}));
@@ -148,7 +154,8 @@ Value *Lifter::InstructionLifter::GetMemOpReference(bool unscaled, unsigned op_i
     if (unscaled)
         base = p.PerformShift(rinst, base, addrop.shift.type, static_cast<uint8_t>(addrop.shift.value));
     else
-        displacement = static_cast<int32_t>(p.PerformShift(static_cast<uint64_t>(displacement), 32, addrop.shift.type, static_cast<uint8_t>(addrop.shift.value)));
+        displacement =
+            static_cast<int32_t>(p.PerformShift(static_cast<uint64_t>(displacement), 32, addrop.shift.type, static_cast<uint8_t>(addrop.shift.value)));
     Value *index = p.GetRegisterView(rinst, {p.cs_handle, addrop.mem.index});
     index = p.PerformShift(rinst, index, addrop.shift.type, static_cast<uint8_t>(addrop.shift.value));
     Value *reference = rinst.builder->CreateAdd(base, index);
@@ -162,7 +169,7 @@ Value *Lifter::InstructionLifter::GetMemOpReference(bool unscaled, unsigned op_i
 
 void Lifter::InstructionLifter::DeferCompilation(bool repeat_instruction) {
     // Below function terminates the block
-    p.CreateLiftTrampoline(rinst, insn.address, rinst.CreateInt(64, insn.address+(repeat_instruction?0:4)));
+    p.CreateLiftTrampoline(rinst, insn.address, rinst.CreateInt(64, insn.address + (repeat_instruction ? 0 : 4)));
 }
 
 bool Lifter::InstructionLifter::Run(bool first_instruction) {
@@ -205,11 +212,7 @@ bool Lifter::InstructionLifter::Run(bool first_instruction) {
     const uint64_t id = insn.is_alias ? insn.alias_id : insn.id;
 
     // Find function that could handle this instruction
-    const auto handlers = {
-        &InstructionLifter::BaseInstructions,
-        &InstructionLifter::VectorInstructions,
-        &InstructionLifter::FloatingPointInstructions
-    };
+    const auto handlers = {&InstructionLifter::BaseInstructions, &InstructionLifter::VectorInstructions, &InstructionLifter::FloatingPointInstructions};
 
     bool handled = false;
     for (const auto handler : handlers) {
@@ -220,7 +223,7 @@ bool Lifter::InstructionLifter::Run(bool first_instruction) {
     }
     if (!handled) {
         const bool noexec = std::find(noexec_addrs.begin(), noexec_addrs.end(), insn.address) != noexec_addrs.end();
-        p.CreateExceptionTrampoline(rinst, noexec?Exception::NoExecuteFault:Exception::UnallocatedEncoding);
+        p.CreateExceptionTrampoline(rinst, noexec ? Exception::NoExecuteFault : Exception::UnallocatedEncoding);
     }
 
     // Switch to next block if not terminated and restore runtime values
@@ -234,4 +237,4 @@ bool Lifter::InstructionLifter::Run(bool first_instruction) {
 
     return !rinst.block_terminated;
 }
-}
+} // namespace Dynautic::A64

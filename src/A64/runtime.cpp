@@ -4,13 +4,11 @@
 #include "runtime.hpp"
 #include "../llvm.hpp"
 
-#include <iostream>
-#include <memory>
 #include <array>
 #include <dynautic/A64.hpp>
+#include <iostream>
 #include <llvm/ExecutionEngine/Orc/TargetProcess/RegisterEHFrames.h>
-
-
+#include <memory>
 
 namespace Dynautic::A64 {
 void ExecutionContext::Create(const llvm::orc::ExecutorAddr& entry) {
@@ -25,13 +23,15 @@ void ExecutionContext::Create(const llvm::orc::ExecutorAddr& entry) {
         mco_destroy(coro);
 
     // Create new coroutine
-    mco_desc desc = mco_desc_init([] (mco_coro* co) {
-        auto data_ptr = reinterpret_cast<Data *>(co->user_data);
-        const auto data = *data_ptr;
-        delete data_ptr;
-        data.self->Yield();
-        data.self->Call(data.entry);
-    }, 0);
+    mco_desc desc = mco_desc_init(
+        [](mco_coro *co) {
+            auto data_ptr = reinterpret_cast<Data *>(co->user_data);
+            const auto data = *data_ptr;
+            delete data_ptr;
+            data.self->Yield();
+            data.self->Call(data.entry);
+        },
+        0);
     desc.user_data = reinterpret_cast<void *>(data);
     mco_create(&coro, &desc);
     Resume(); // Despite clang-analyzer complaining, no memory will leak here
@@ -43,10 +43,7 @@ void ExecutionContext::Destroy() {
     }
 }
 
-void ExecutionContext::Call(const llvm::orc::ExecutorAddr &execution_addr) {
-    execution_addr.toPtr<void(void)>()();
-}
-
+void ExecutionContext::Call(const llvm::orc::ExecutorAddr& execution_addr) { execution_addr.toPtr<void(void)>()(); }
 
 class LLVMInitSingleton {
     std::unique_ptr<llvm::InitLLVM> init;
@@ -107,7 +104,7 @@ void Runtime::Impl::CreateGlobals() {
     std::unique_ptr<Module> module = std::make_unique<Module>("Globals", *context);
 
     // Create globals
-    auto CreateGlobal = [&] (Type *type, llvm::StringRef name) {
+    auto CreateGlobal = [&](Type *type, llvm::StringRef name) {
         module->getOrInsertGlobal(name, type);
         GlobalVariable *global = module->getNamedGlobal(name);
         global->setLinkage(GlobalValue::ExternalLinkage);
@@ -116,9 +113,9 @@ void Runtime::Impl::CreateGlobals() {
     };
     CreateGlobal(Type::getInt64Ty(*context), "stack_pointer");
     for (unsigned idx = 0; idx != 31; idx++)
-        CreateGlobal(Type::getInt64Ty(*context), "general_register_"+std::to_string(idx));
+        CreateGlobal(Type::getInt64Ty(*context), "general_register_" + std::to_string(idx));
     for (unsigned idx = 0; idx != 32; idx++)
-        CreateGlobal(Type::getInt128Ty(*context), "vector_register_"+std::to_string(idx));
+        CreateGlobal(Type::getInt128Ty(*context), "vector_register_" + std::to_string(idx));
     CreateGlobal(Type::getInt64Ty(*context), "comparison_first");
     CreateGlobal(Type::getInt64Ty(*context), "comparison_second");
     CreateGlobal(Type::getInt8Ty(*context), "nzcv");
@@ -260,13 +257,9 @@ void Runtime::Impl::MemoryWrite128(Runtime::Impl& self, VAddr vaddr, Vector valu
     self.CheckHalt();
 }
 
+Runtime::Runtime(UserConfig conf) : impl(new Impl(conf, this)) {}
 
-Runtime::Runtime(UserConfig conf)
-    : impl(new Impl(conf, this)) {}
-
-Runtime::~Runtime() {
-    delete impl;
-}
+Runtime::~Runtime() { delete impl; }
 
 HaltReason Runtime::Run() {
     impl->executing = true;
@@ -274,7 +267,8 @@ HaltReason Runtime::Run() {
 
     auto expected_addr = impl->lifter.Lift(impl->pc);
     if (!expected_addr) {
-        impl->conf.callbacks->ExceptionRaised(impl->pc, Exception::UnpredictableInstruction); //TODO: Raise proper exception?
+        impl->conf.callbacks->ExceptionRaised(impl->pc,
+                                              Exception::UnpredictableInstruction); // TODO: Raise proper exception?
         return HaltReason::MemoryAbort;
     }
 
@@ -303,17 +297,13 @@ void Runtime::Reset() {
     impl = new Impl(impl->conf, this);
 }
 
-void Runtime::ClearCache() {
-    impl->ClearCache();
-}
+void Runtime::ClearCache() { impl->ClearCache(); }
 
 void Runtime::ClearJIT() { impl->ClearJIT(); }
 
 void Runtime::HaltExecution(HaltReason hr) { impl->halt_reason |= hr; }
 
-void Runtime::ClearHalt(HaltReason hr) {
-    impl->halt_reason &= ~hr;
-}
+void Runtime::ClearHalt(HaltReason hr) { impl->halt_reason &= ~hr; }
 
 StateDump Runtime::DumpState() { return impl->DumpState(); }
 
@@ -321,17 +311,15 @@ void Runtime::RestoreState(const StateDump& dump) { impl->RestoreState(dump); }
 
 std::uint64_t Runtime::GetSP() const {
     if (auto expected_address = impl->jit->lookup("stack_pointer"))
-        return *reinterpret_cast<const std::uint64_t*>(expected_address->getValue());
+        return *reinterpret_cast<const std::uint64_t *>(expected_address->getValue());
     return 0xbad0cac;
 }
 void Runtime::SetSP(std::uint64_t value) {
     if (auto expected_address = impl->jit->lookup("stack_pointer"))
-        *reinterpret_cast<std::uint64_t*>(expected_address->getValue()) = value;
+        *reinterpret_cast<std::uint64_t *>(expected_address->getValue()) = value;
 }
 
-std::uint64_t Runtime::GetPC() const {
-    return impl->pc;
-}
+std::uint64_t Runtime::GetPC() const { return impl->pc; }
 void Runtime::SetPC(std::uint64_t value) {
     DYNAUTIC_ASSERT(!impl->executing);
     impl->exc.Destroy();
@@ -339,13 +327,13 @@ void Runtime::SetPC(std::uint64_t value) {
 }
 
 std::uint64_t Runtime::GetRegister(std::size_t index) const {
-    if (auto expected_address = impl->jit->lookup("general_register_"+std::to_string(index)))
-        return *reinterpret_cast<const std::uint64_t*>(expected_address->getValue());
+    if (auto expected_address = impl->jit->lookup("general_register_" + std::to_string(index)))
+        return *reinterpret_cast<const std::uint64_t *>(expected_address->getValue());
     return 0xbad0cac;
 }
 void Runtime::SetRegister(size_t index, std::uint64_t value) {
-    if (auto expected_address = impl->jit->lookup("general_register_"+std::to_string(index)))
-        *reinterpret_cast<std::uint64_t*>(expected_address->getValue()) = value;
+    if (auto expected_address = impl->jit->lookup("general_register_" + std::to_string(index)))
+        *reinterpret_cast<std::uint64_t *>(expected_address->getValue()) = value;
 }
 
 std::array<std::uint64_t, 31> Runtime::GetRegisters() const {
@@ -360,12 +348,12 @@ void Runtime::SetRegisters(const std::array<std::uint64_t, 31>& values) {
 }
 
 Vector Runtime::GetVector(std::size_t index) const {
-    if (auto expected_address = impl->jit->lookup("vector_register_"+std::to_string(index)))
-        return *reinterpret_cast<const Vector*>(expected_address->getValue());
+    if (auto expected_address = impl->jit->lookup("vector_register_" + std::to_string(index)))
+        return *reinterpret_cast<const Vector *>(expected_address->getValue());
 }
 void Runtime::SetVector(std::size_t index, Vector value) {
-    if (auto expected_address = impl->jit->lookup("vector_register_"+std::to_string(index)))
-        *reinterpret_cast<Vector*>(expected_address->getValue()) = value;
+    if (auto expected_address = impl->jit->lookup("vector_register_" + std::to_string(index)))
+        *reinterpret_cast<Vector *>(expected_address->getValue()) = value;
 }
 
 std::array<Vector, 32> Runtime::GetVectors() const {
@@ -400,19 +388,13 @@ void Runtime::SetPstate(std::uint32_t value) {
     //
 }
 
-std::vector<uint64_t> Runtime::DumpCache() const {
-    return impl->cache.Dump();
-}
+std::vector<uint64_t> Runtime::DumpCache() const { return impl->cache.Dump(); }
 
-void Runtime::LoadCache(const std::vector<uint64_t>& data) {
-    impl->cache.Load(data);
-}
+void Runtime::LoadCache(const std::vector<uint64_t>& data) { impl->cache.Load(data); }
 
-bool Runtime::IsExecuting() const {
-    return impl->executing;
-}
+bool Runtime::IsExecuting() const { return impl->executing; }
 
 std::vector<std::string> Runtime::Disassemble() const {
     //
 }
-}
+} // namespace Dynautic::A64

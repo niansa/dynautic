@@ -2,10 +2,8 @@
 #define DYNAUTIC_HPP
 #include "common.hpp"
 
-#include <stdexcept>
 #include <dynautic/A64.hpp>
-
-
+#include <stdexcept>
 
 class MyEnvironment final : public Dynautic::A64::UserCallbacks {
 public:
@@ -17,23 +15,25 @@ public:
 
     std::optional<std::uint32_t> MemoryReadCode(Dynautic::A64::VAddr vaddr) override {
         switch (vaddr) {
-        case TestBase::exit_addr + 0: return 0xd4000081; // svc #4
-        case TestBase::exit_addr + 4: return 0xd65f03c0; // ret
+        case TestBase::exit_addr + 0:
+            return 0xd4000081; // svc #4
+        case TestBase::exit_addr + 4:
+            return 0xd65f03c0; // ret
         default: {
             if (vaddr > TestBase::exit_addr && vaddr < TestBase::exit_addr + 0x10000)
                 return {};
-            return *reinterpret_cast<u32*>(vaddr);
+            return *reinterpret_cast<u32 *>(vaddr);
         };
         }
     }
 
-    u8 MemoryRead8(Dynautic::A64::VAddr) override {return {};}
-    u16 MemoryRead16(Dynautic::A64::VAddr) override {return {};}
-    u32 MemoryRead32(Dynautic::A64::VAddr) override {return {};}
-    u64 MemoryRead64(Dynautic::A64::VAddr) override {return {};}
-    Dynautic::A64::Vector MemoryRead128(Dynautic::A64::VAddr) override {return {};}
+    u8 MemoryRead8(Dynautic::A64::VAddr) override { return {}; }
+    u16 MemoryRead16(Dynautic::A64::VAddr) override { return {}; }
+    u32 MemoryRead32(Dynautic::A64::VAddr) override { return {}; }
+    u64 MemoryRead64(Dynautic::A64::VAddr) override { return {}; }
+    Dynautic::A64::Vector MemoryRead128(Dynautic::A64::VAddr) override { return {}; }
 
-    void MemoryWrite8(Dynautic::A64::VAddr, u8 ) override {}
+    void MemoryWrite8(Dynautic::A64::VAddr, u8) override {}
     void MemoryWrite16(Dynautic::A64::VAddr, u16) override {}
     void MemoryWrite32(Dynautic::A64::VAddr, u32) override {}
     void MemoryWrite64(Dynautic::A64::VAddr, u64) override {}
@@ -53,15 +53,18 @@ public:
                 std::cout << std::dec << " - [x" << idx << "] 0x" << std::hex << cpu->GetRegister(idx) << '\n';
             }
             std::cout << "\nMisc registers:\n"
-                         " - [sp] 0x" << std::hex << cpu->GetSP() << "\n"
-                         " - [pc] 0x" << std::hex << cpu->GetPC() << "\n\n";
+                         " - [sp] 0x"
+                      << std::hex << cpu->GetSP()
+                      << "\n"
+                         " - [pc] 0x"
+                      << std::hex << cpu->GetPC() << "\n\n";
         } else {
             cpu->HaltExecution(Dynautic::HaltReason::UserDefined1);
         }
     }
 
     void ExceptionRaised(u64 pc, ::Dynautic::A64::Exception exception) override {
-        std::cerr << "Dynautic error: Exception raised at " << reinterpret_cast<void*>(pc) << ": " << static_cast<unsigned>(exception) << std::endl;
+        std::cerr << "Dynautic error: Exception raised at " << reinterpret_cast<void *>(pc) << ": " << static_cast<unsigned>(exception) << std::endl;
         if (exception == Dynautic::A64::Exception::UnallocatedEncoding || exception == Dynautic::A64::Exception::UnpredictableInstruction)
             cpu->HaltExecution(Dynautic::HaltReason::UserDefined3);
         else
@@ -76,15 +79,10 @@ public:
         ticks_left -= ticks;
     }
 
-    u64 GetTicksRemaining() override {
-        return ticks_left;
-    }
+    u64 GetTicksRemaining() override { return ticks_left; }
 
-    std::uint64_t GetCNTPCT() override {
-        return 0;
-    }
+    std::uint64_t GetCNTPCT() override { return 0; }
 };
-
 
 class TestDynautic final : public TestBase {
     MyEnvironment env;
@@ -105,7 +103,7 @@ public:
         for (unsigned run = 0; run != 2; ++run) {
             // Configure
             user_config.update_cache = !(user_config.use_cache = user_config.unsafe_optimizations = user_config.fully_static = !cache.empty());
-            //user_config.dump_assembly = user_config.fully_static;
+            // user_config.dump_assembly = user_config.fully_static;
 
             // Create runtime
             Dynautic::A64::Runtime cpu(user_config);
@@ -121,18 +119,22 @@ public:
             // Set up registers
             cpu.SetRegister(0, 0xfabd3dd59df77212);
             cpu.SetRegister(30, exit_addr);
-            cpu.SetSP(reinterpret_cast<u64>(stack.data()+stack.size()));
+            cpu.SetSP(reinterpret_cast<u64>(stack.data() + stack.size()));
             cpu.SetPC(reinterpret_cast<u64>(fnc));
 
-            // Execute
-            restart:
+        // Execute
+        restart:
             common::Timer timer;
             const auto halt_reason = cpu.Run();
             const auto duration = timer.get();
             switch (halt_reason) {
-            case Dynautic::HaltReason::UserDefined4: break;
-            case Dynautic::HaltReason::UserDefined3: cpu.SetPC(cpu.GetPC()+4); goto restart;
-            default: throw std::runtime_error("Dynautic error: Unexpected halt reasons: "+std::to_string(static_cast<uint32_t>(halt_reason)));
+            case Dynautic::HaltReason::UserDefined4:
+                break;
+            case Dynautic::HaltReason::UserDefined3:
+                cpu.SetPC(cpu.GetPC() + 4);
+                goto restart;
+            default:
+                throw std::runtime_error("Dynautic error: Unexpected halt reasons: " + std::to_string(static_cast<uint32_t>(halt_reason)));
             }
 
             // Save cache

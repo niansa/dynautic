@@ -2,36 +2,20 @@
 
 #include "../llvm.hpp"
 
+#include <capstone/capstone.h>
+#include <dynautic/A64.hpp>
+#include <optional>
+#include <queue>
 #include <string>
 #include <string_view>
-#include <vector>
 #include <unordered_map>
-#include <queue>
-#include <optional>
-#include <dynautic/A64.hpp>
-#include <capstone/capstone.h>
-
+#include <vector>
 
 namespace Dynautic::A64 {
 struct RegisterDescription {
-    enum class Type {
-        invalid,
-        scratch,
-        general,
-        scalar,
-        vector,
-        stack_pointer
-    } type = Type::invalid;
+    enum class Type { invalid, scratch, general, scalar, vector, stack_pointer } type = Type::invalid;
 
-    enum Size : uint8_t {
-        byte = 8,
-        half = 16,
-        single = 32,
-        word = 32,
-        double_ = 64,
-        double_word = 64,
-        quad = 128
-    };
+    enum Size : uint8_t { byte = 8, half = 16, single = 32, word = 32, double_ = 64, double_word = 64, quad = 128 };
     uint8_t size = Size::double_word;
 
     uint8_t elements = 0;
@@ -41,21 +25,21 @@ struct RegisterDescription {
     RegisterDescription() {}
     RegisterDescription(const char *name, VectorLayout vas = AArch64Layout_Invalid);
     RegisterDescription(csh handle, aarch64_reg reg, VectorLayout vas = AArch64Layout_Invalid);
-    RegisterDescription(unsigned scratchIdx, bool isWord) : type(Type::scratch), size(isWord?Size::word:Size::double_word), idx(scratchIdx) {}
+    RegisterDescription(unsigned scratchIdx, bool isWord) : type(Type::scratch), size(isWord ? Size::word : Size::double_word), idx(scratchIdx) {}
 
-    bool operator==(RegisterDescription o) const {
-        return idx == o.idx && size == o.size && type == o.type;
-    }
-    bool operator!=(RegisterDescription o) const {
-        return idx != o.idx || size != o.size || type != o.type;
-    }
+    bool operator==(RegisterDescription o) const { return idx == o.idx && size == o.size && type == o.type; }
+    bool operator!=(RegisterDescription o) const { return idx != o.idx || size != o.size || type != o.type; }
 
     uint8_t GetFullTypeSize() const {
         switch (type) {
-        case Type::scratch: return 128;
-        case Type::general: return 64;
-        case Type::scalar: return 128;
-        case Type::stack_pointer: return 64;
+        case Type::scratch:
+            return 128;
+        case Type::general:
+            return 64;
+        case Type::scalar:
+            return 128;
+        case Type::stack_pointer:
+            return 64;
         default: {
             DYNAUTIC_ASSERT(!"Invalid register type");
             return 0;
@@ -65,11 +49,8 @@ struct RegisterDescription {
 
     std::string GetName() const;
 
-    bool IsZero() const {
-        return idx < 0;
-    }
+    bool IsZero() const { return idx < 0; }
 };
-
 
 class Lifter {
     class Instance;
@@ -115,17 +96,18 @@ class Lifter {
 
     llvm::TypeSize GetTypeSizeInBits(Instance&, llvm::Type *);
 
-    llvm::Value *&GetRawRegister(RegisterDescription, bool allow_overwrite);
+    llvm::Value *& GetRawRegister(RegisterDescription, bool allow_overwrite);
     llvm::Value *GetRegisterView(Instance&, RegisterDescription, llvm::Type *);
     llvm::Value *GetRegisterView(Instance&, RegisterDescription);
     llvm::Value *StoreRegister(Instance&, RegisterDescription, llvm::Value *, aarch64_shifter shift_type = AArch64_SFT_INVALID, uint8_t shift = 0);
-    llvm::Value *StoreRegister16(Instance&, RegisterDescription, uint16_t value, bool keep, aarch64_shifter shift_type = AArch64_SFT_INVALID, uint8_t shift = 0);
+    llvm::Value *StoreRegister16(Instance&, RegisterDescription, uint16_t value, bool keep, aarch64_shifter shift_type = AArch64_SFT_INVALID,
+                                 uint8_t shift = 0);
 
     llvm::Value *PerformShift(Instance&, llvm::Value *, aarch64_shifter type, llvm::Value *shift);
     llvm::Value *PerformShift(Instance&, llvm::Value *, aarch64_shifter type, uint8_t shift);
     uint64_t PerformShift(uint64_t, uint8_t bits, aarch64_shifter type, uint8_t shift);
 
-    llvm::ArrayRef<llvm::Value*> GetFunctionArgs() const;
+    llvm::ArrayRef<llvm::Value *> GetFunctionArgs() const;
 
     void LoadBranchContext(Instance&);
     void FinalizeBranchContext(Instance&);
@@ -195,9 +177,7 @@ public:
     Lifter(Runtime::Impl& runtime);
     ~Lifter();
 
-    bool IsOk() const {
-        return cs_handle != 0;
-    }
+    bool IsOk() const { return cs_handle != 0; }
 
     void Reset() {
         while (!queued_functions.empty())
@@ -214,4 +194,4 @@ public:
 
     static llvm::FunctionCallee GetLiftedFunction(Instance&, VAddr addr);
 };
-}
+} // namespace Dynautic::A64

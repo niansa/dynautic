@@ -4,3 +4,6 @@
 [submodule "tests/dynarmic"]
 	path = tests/dynarmic
 	url = https://github.com/yuzu-mirror/dynarmic.git
+[submodule "externals/sanmake"]
+	path = externals/sanmake
+	url = https://gitlab.com/niansa/sanmake.git
