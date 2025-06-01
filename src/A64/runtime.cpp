@@ -61,16 +61,8 @@ public:
 } g_LLVMInitSingleton;
 
 Runtime::Impl::Impl(UserConfig conf_, Runtime *parent) : parent(parent), lifter(*this), conf(conf_) {
-    // Enforce configuration restraints
-    if (!conf.unsafe_optimizations) {
-        conf.fully_static = false;
-        conf.optimizations &= all_safe_optimizations;
-    }
-    conf.use_cache = conf.use_cache && conf.HasOptimization(OptimizationFlag::BlockLinking);
-    conf.fully_static = conf.fully_static && conf.use_cache;
-    conf.update_cache = conf.update_cache && !conf.fully_static;
-    if (!(conf.update_cache && conf.use_cache))
-        conf.periodic_recompile = 0;
+    // Enforce configuration constraints
+    EnforceConfigConstraints();
 
     // Create global monitor if not ignored
     if (!conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)) {
@@ -80,6 +72,18 @@ Runtime::Impl::Impl(UserConfig conf_, Runtime *parent) : parent(parent), lifter(
 
     // Create JIT engine
     CreateJit();
+}
+
+void Runtime::Impl::EnforceConfigConstraints() {
+    if (!conf.unsafe_optimizations) {
+        conf.fully_static = false;
+        conf.optimizations &= all_safe_optimizations;
+    }
+    conf.use_cache = conf.use_cache && conf.HasOptimization(OptimizationFlag::BlockLinking);
+    conf.fully_static = conf.fully_static && conf.use_cache;
+    conf.update_cache = conf.update_cache && !conf.fully_static;
+    if (!(conf.update_cache && conf.use_cache))
+        conf.periodic_recompile = 0;
 }
 
 void Runtime::Impl::CreateJit() {
