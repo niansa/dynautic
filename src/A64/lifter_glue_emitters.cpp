@@ -274,7 +274,7 @@ void Lifter::CreateCall(Instance& rinst, VAddr origin, llvm::Value *address, boo
 
     CreateLiftTrampoline(rinst, origin, address, no_cache);
 }
-void Lifter::CreateCall(Instance& rinst, VAddr origin, VAddr address) {
+void Lifter::CreateCall(Instance& rinst, VAddr origin, VAddr address, bool tail_call) {
     CreateDebugPrintTrampoline(rinst, "Branching to constant offset");
 
     // Use deferring lift if configured to
@@ -287,7 +287,8 @@ void Lifter::CreateCall(Instance& rinst, VAddr origin, VAddr address) {
     DeferLift(address);
     // Call into lifted address
     CallInst *call = rinst.builder->CreateCall(Lifter::GetLiftedFunction(rinst, address), GetFunctionArgs());
-    call->setTailCall();
+    if (tail_call)
+        call->setTailCall();
     call->setCallingConv(CallingConv::Tail);
     rinst.builder->CreateRetVoid();
     rinst.block_terminated = true;

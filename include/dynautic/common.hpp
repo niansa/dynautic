@@ -24,6 +24,7 @@ enum class HaltReason : std::uint32_t {
     CacheInvalidation = 0x00000002,
     MemoryAbort = 0x00000004,
     JITInvalidation = 0x00000008,
+    JITActivity = 0x00000010,
     UserDefined1 = 0x01000000,
     UserDefined2 = 0x02000000,
     UserDefined3 = 0x04000000,

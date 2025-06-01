@@ -210,12 +210,16 @@ public:
         restart:
             const auto halt_reason = cpu.Run();
             switch (halt_reason) {
+            case Dynautic::HaltReason::None:
+                goto restart;
             case Dynautic::HaltReason::UserDefined4:
                 break;
             case Dynautic::HaltReason::UserDefined3:
                 throw std::runtime_error("Bad instruction encountered at " + std::to_string(cpu.GetPC()));
             case Dynautic::HaltReason::JITInvalidation:
                 std::cout << "Reoptimizing with " << cpu.DumpCache().size() << " bytes of cache data\n";
+                goto restart;
+            case Dynautic::HaltReason::JITActivity:
                 goto restart;
             default:
                 throw std::runtime_error("Dynautic error: Unexpected halt reasons (" + std::to_string(static_cast<uint32_t>(halt_reason)) + ") at " +

@@ -15,22 +15,11 @@ void LiftTrampoline(Lifter& self, VAddr addr) {
 #ifdef ENABLE_RUNTIME_DEBUG_MESSAGES
     std::cout << "Runtime debug message: Calling function at " << std::hex << addr << " via trampoline" << std::dec << std::endl;
 #endif
-    self.rt.CheckHalt();
-    // This is the wrong signature, but still valid (hopefully). It's needed to
-    // enforce tail call optimization
-    using Function = decltype(LiftTrampoline);
-    Function *fnc;
-    {
-        auto executor_address = self.Lift(addr);
-        DYNAUTIC_ASSERT(executor_address.has_value());
-        fnc = executor_address->toPtr<Function>();
-    }
-#ifdef __clang__
-    __attribute__((musttail))
-#else
-#warning "GCC does not support musttail, LiftTrampoline stack overhead may be increased"
-#endif
-    return fnc(self, addr);
+
+    // Set new PC and halt
+    self.rt.pc = addr;
+    self.rt.halt_reason |= HaltReason::JITActivity;
+    self.rt.exc.Yield();
 }
 
 void SvcTrampoline(Runtime::Impl& rt, uint32_t swi) {

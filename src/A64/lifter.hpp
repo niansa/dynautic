@@ -128,7 +128,7 @@ class Lifter {
     void CreateMemoryStore(Instance&, llvm::Value *address, llvm::Value *data, bool volatile_ = false, uint8_t alignment = 0);
 
     void CreateCall(Instance&, VAddr origin, llvm::Value *address, bool no_cache = false);
-    void CreateCall(Instance&, VAddr origin, VAddr address);
+    void CreateCall(Instance&, VAddr origin, VAddr address, bool tail_call = true);
     llvm::BasicBlock *PrepareBranch(Instance&, VAddr origin, llvm::Value *address);
     llvm::BasicBlock *PrepareBranch(Instance&, VAddr address);
     void CreateBranch(Instance&, llvm::BasicBlock *);

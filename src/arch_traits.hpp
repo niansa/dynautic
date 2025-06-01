@@ -4,11 +4,11 @@
 namespace Dynautic {
 namespace ArchTraits {
 #if defined(__x86_64__)
-constexpr unsigned max_arg_count = 6;
+constexpr unsigned max_arg_count = 14;
 #elif defined(__aarch64__)
-constexpr unsigned max_arg_count = 8;
+constexpr unsigned max_arg_count = 16;
 #else
-constexpr unsigned max_arg_count = 0;
+constexpr unsigned max_arg_count = 10;
 #endif
 } // namespace ArchTraits
 } // namespace Dynautic

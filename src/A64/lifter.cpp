@@ -103,7 +103,7 @@ std::optional<ExecutorAddr> Lifter::Lift(VAddr addr) {
     const auto entry_fnc_name = GetFunctionName(addr) + "Entry";
 
     // Create entry function
-    Instance rinst(rt, context.get(), module.get(), entry_fnc_name);
+    Instance rinst(rt, context.get(), module.get(), entry_fnc_name, true);
     rinst.pc = addr;
     rinst.UseBasicBlock(rinst.CreateBasicBlock("EntryBlock"));
     if (rt.conf.periodic_recompile)
