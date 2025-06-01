@@ -101,6 +101,10 @@ public:
     llvm::ConstantInt *CreateInt(uint8_t bits, uint64_t value) {
         return llvm::ConstantInt::get(reinterpret_cast<llvm::IntegerType *>(GetIntType(bits)), value);
     }
+
+    llvm::GlobalVariable *CreateGlobal(llvm::Type *type, llvm::StringRef name, llvm::GlobalValue::LinkageTypes linkage) {
+        return rt.CreateGlobal(module, type, name, linkage);
+    }
 };
 } // namespace Dynautic::A64
 

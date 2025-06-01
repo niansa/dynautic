@@ -124,6 +124,7 @@ public:
             user_config.periodic_recompile = 0;
             user_config.native_memory = false;
             user_config.unsafe_optimizations = false;
+            user_config.dump_assembly = true;
         } break;
         case 1: {
             user_config.update_cache = true;
@@ -131,6 +132,7 @@ public:
             user_config.periodic_recompile = 100;
             user_config.native_memory = false;
             user_config.unsafe_optimizations = false;
+            user_config.dump_assembly = false;
         } break;
         case 2: {
             user_config.update_cache = false;
@@ -138,6 +140,7 @@ public:
             user_config.periodic_recompile = 0;
             user_config.native_memory = false;
             user_config.unsafe_optimizations = true;
+            user_config.dump_assembly = false;
         } break;
         case 3: {
             user_config.update_cache = false;
@@ -145,6 +148,7 @@ public:
             user_config.periodic_recompile = 0;
             user_config.native_memory = true;
             user_config.unsafe_optimizations = true;
+            user_config.dump_assembly = true;
         } break;
         }
     }

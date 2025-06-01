@@ -10,7 +10,7 @@
 
 #include <dynautic/A64.hpp>
 #include <memory>
-#include <unordered_map>
+#include <vector>
 
 namespace Dynautic::A64 {
 class ExecutionContext {
@@ -64,7 +64,10 @@ struct Runtime::Impl {
     /// Recreates JIT. Updates IsOk() state.
     void CreateJit();
 
-    /// Create new globals. Called by CreateJit(). Updates IsOk() state.
+    /// Create new global.
+    llvm::GlobalVariable *CreateGlobal(llvm::Module *module, llvm::Type *type, llvm::StringRef name, llvm::GlobalValue::LinkageTypes linkage);
+
+    /// Create new execution context globals. Called by CreateJit(). Updates IsOk() state.
     void CreateGlobals();
 
     /// Dump CPU state from globals.

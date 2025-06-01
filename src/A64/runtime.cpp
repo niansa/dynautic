@@ -6,7 +6,6 @@
 
 #include <array>
 #include <dynautic/A64.hpp>
-#include <iostream>
 #include <llvm/ExecutionEngine/Orc/TargetProcess/RegisterEHFrames.h>
 #include <memory>
 
@@ -100,6 +99,19 @@ void Runtime::Impl::CreateJit() {
     CreateGlobals();
 }
 
+llvm::GlobalVariable *Runtime::Impl::CreateGlobal(llvm::Module *module, llvm::Type *type, llvm::StringRef name, llvm::GlobalValue::LinkageTypes linkage) {
+    using namespace llvm;
+
+    module->getOrInsertGlobal(name, type);
+    GlobalVariable *global = module->getNamedGlobal(name);
+    global->setLinkage(linkage);
+    global->setInitializer(Constant::getNullValue(type));
+    global->setConstant(false);
+    global->setDSOLocal(true);
+    // global->setThreadLocalMode(GlobalValue::LocalExecTLSModel);
+    return global;
+}
+
 void Runtime::Impl::CreateGlobals() {
     using namespace llvm;
 
@@ -108,21 +120,14 @@ void Runtime::Impl::CreateGlobals() {
     std::unique_ptr<Module> module = std::make_unique<Module>("Globals", *context);
 
     // Create globals
-    auto CreateGlobal = [&](Type *type, llvm::StringRef name) {
-        module->getOrInsertGlobal(name, type);
-        GlobalVariable *global = module->getNamedGlobal(name);
-        global->setLinkage(GlobalValue::ExternalLinkage);
-        global->setInitializer(Constant::getNullValue(type));
-        global->setConstant(false);
-    };
-    CreateGlobal(Type::getInt64Ty(*context), "stack_pointer");
+    CreateGlobal(module.get(), Type::getInt64Ty(*context), "stack_pointer", GlobalValue::ExternalLinkage);
     for (unsigned idx = 0; idx != 31; idx++)
-        CreateGlobal(Type::getInt64Ty(*context), "general_register_" + std::to_string(idx));
+        CreateGlobal(module.get(), Type::getInt64Ty(*context), "general_register_" + std::to_string(idx), GlobalValue::ExternalLinkage);
     for (unsigned idx = 0; idx != 32; idx++)
-        CreateGlobal(Type::getInt128Ty(*context), "vector_register_" + std::to_string(idx));
-    CreateGlobal(Type::getInt64Ty(*context), "comparison_first");
-    CreateGlobal(Type::getInt64Ty(*context), "comparison_second");
-    CreateGlobal(Type::getInt8Ty(*context), "nzcv");
+        CreateGlobal(module.get(), Type::getInt128Ty(*context), "vector_register_" + std::to_string(idx), GlobalValue::ExternalLinkage);
+    CreateGlobal(module.get(), Type::getInt64Ty(*context), "comparison_first", GlobalValue::ExternalLinkage);
+    CreateGlobal(module.get(), Type::getInt64Ty(*context), "comparison_second", GlobalValue::ExternalLinkage);
+    CreateGlobal(module.get(), Type::getInt8Ty(*context), "nzcv", GlobalValue::ExternalLinkage);
 
     // Dump generated IR if enabled
     if (conf.dump_assembly)
@@ -354,6 +359,7 @@ void Runtime::SetRegisters(const std::array<std::uint64_t, 31>& values) {
 Vector Runtime::GetVector(std::size_t index) const {
     if (auto expected_address = impl->jit->lookup("vector_register_" + std::to_string(index)))
         return *reinterpret_cast<const Vector *>(expected_address->getValue());
+    return {0xbad0cac, 0xbad0cac};
 }
 void Runtime::SetVector(std::size_t index, Vector value) {
     if (auto expected_address = impl->jit->lookup("vector_register_" + std::to_string(index)))

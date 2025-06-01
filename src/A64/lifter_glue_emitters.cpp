@@ -215,13 +215,13 @@ void Lifter::CreateResetJITForPeriodicRecompileTrampolineTrampoline(Instance& ri
 }
 
 Value *Lifter::CreateLoadFromGlobal(Instance& rinst, llvm::StringRef global_name, llvm::Type *type) {
-    return rinst.builder->CreateLoad(type, rinst.module->getOrInsertGlobal(global_name, type));
+    return rinst.builder->CreateLoad(type, rinst.CreateGlobal(type, global_name, GlobalValue::AvailableExternallyLinkage));
 }
 void Lifter::CreateLoadFromGlobalIntoPtr(Instance& rinst, llvm::StringRef global_name, llvm::Type *type, llvm::Value *ptr) {
     rinst.builder->CreateStore(CreateLoadFromGlobal(rinst, global_name, type), ptr);
 }
 void Lifter::CreateStoreToGlobal(Instance& rinst, llvm::StringRef global_name, llvm::Value *value) {
-    rinst.builder->CreateStore(value, rinst.module->getOrInsertGlobal(global_name, value->getType()));
+    rinst.builder->CreateStore(value, rinst.CreateGlobal(value->getType(), global_name, GlobalValue::AvailableExternallyLinkage));
 }
 
 Value *Lifter::CreateLoadFromPtr(Instance& rinst, const void *ptr, Type *type, const llvm::Twine& name) {
